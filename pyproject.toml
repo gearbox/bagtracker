@@ -1,13 +1,13 @@
 [project]
-name = "fastapi-template"
-version = "v1.1.1"
-description = "FastAPI Template Project"
+name = "bagtracker"
+version = "v0.0.1"
+description = "Bag Tracker. Track Your Bags. Embrace the Rekt."
 authors = ["Mihail Tayrov <mtayrov@gmail.com>"]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.14.0",
-    "fastapi[standard]>=0.115.6",
+    "fastapi[standard]>=0.116.1",
     "gunicorn>=23.0.0",
     "loguru>=0.7.3",
     "psycopg2-binary>=2.9.10",
@@ -62,7 +62,7 @@ quote-style = "double"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "SIM", "UP"]
-ignore = ["E722", "B904", "B008"]
+ignore = ["B008"]
 
 [dependency-groups]
 dev = [
