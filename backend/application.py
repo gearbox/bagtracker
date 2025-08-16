@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     This function is called when the application starts and stops.
     """
     # startup logic
-    app.start_time = datetime.now(UTC)
+    app.state.start_time = datetime.now(UTC)
     init_logging()
     postgres.init_postgres()
     yield
@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
     @app.get("/docs", include_in_schema=False)
     async def custom_swagger_ui_html():
         return get_swagger_ui_html(
-            openapi_url=app.openapi_url,
+            openapi_url=app.openapi_url or "/openapi.json",
             title=f"{app.title} - Swagger UI",
             oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
             swagger_js_url="/static/openapi/swagger-ui-bundle.js",
@@ -70,7 +70,7 @@ def create_app() -> FastAPI:
     @app.get("/redoc", include_in_schema=False)
     async def redoc_html():
         return get_redoc_html(
-            openapi_url=app.openapi_url,
+            openapi_url=app.openapi_url or "/openapi.json",
             title=f"{app.title} - ReDoc",
             redoc_js_url="/static/openapi/redoc.standalone.js",
         )

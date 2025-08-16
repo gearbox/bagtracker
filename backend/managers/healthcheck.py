@@ -26,8 +26,8 @@ class HealthCheckManager:
         try:
             return APIHealthCheck(
                 status=True,
-                start_time=self.app.start_time,
-                uptime_sec=int((datetime.now(UTC) - self.app.start_time).total_seconds()),
+                start_time=self.app.state.start_time,
+                uptime_sec=int((datetime.now(UTC) - self.app.state.start_time).total_seconds()),
             )
         except Exception as e:
             error_message = f"API healthcheck failed with error: {e}"

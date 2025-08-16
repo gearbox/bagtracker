@@ -1,7 +1,9 @@
+name: bagtracker
 services:
   app-backend:
     environment:
       - UVICORN_WORKERS=${UVICORN_WORKERS}
+      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
       - BACKEND_HOST=${BACKEND_HOST}
       - BACKEND_PORT=${BACKEND_PORT}
       - BIND_HOST_PORT=${BIND_HOST_PORT}
@@ -14,21 +16,24 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     env_file:
-      - path: ../.env
+      - path: .env
         required: false
     build:
-      context: ../
+      context: .
       dockerfile: ./docker/app/Dockerfile
     container_name: app-backend
     hostname: app-backend
     networks:
       - app-network
     ports:
-     - "$BIND_HOST:$BIND_HOST_PORT:$BACKEND_PORT"
+      - "$BIND_HOST:$BIND_HOST_PORT:$BACKEND_PORT"
+    volumes:
+      - ./backend:/code
+      - ./var/log/backend:/code/log
     depends_on:
-      app-postgres:
+      db:
         condition: service_healthy
-      app-redis:
+      redis:
         condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "/bin/bash -c 'exec 3<>/dev/tcp/$BACKEND_HOST/$BACKEND_PORT;echo -e \"GET /healthcheck HTTP/1.1\r\nhost: http://$BACKEND_HOST\r\nConnection: close\r\n\r\n\" >&3;grep \"HTTP/1.1 200 OK\" <&3'" ]
@@ -37,26 +42,28 @@ services:
       retries: 5
     restart: always
 
-  app-postgres:
+  db:
     environment:
       - BIND_HOST=${BIND_HOST}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     env_file:
-      - path: ../.env
+      - path: .env
         required: false
     build:
-      context: ../
+      context: .
       dockerfile: ./docker/db/Dockerfile
-    container_name: app-postgres
-    hostname: app-postgres
+    container_name: portfolio-db
+    hostname: portfolio-db
     networks:
       - app-network
     ports:
       - "$BIND_HOST:$POSTGRES_PORT:$POSTGRES_PORT"
     volumes:
-       - ./var/db/postgresql/app:/var/lib/postgresql/data
+      - ./var/db/postgresql/app:/var/lib/postgresql/data
     # please uncomment next line to enable full PostgreSQL logging
     # it might be very useful for debugging purposes
     # command: ["postgres", "-c", "log_statement=all", "-c", "log_destination=stderr"]
@@ -66,13 +73,13 @@ services:
       retries: 5
     restart: always
 
-  app-redis:
+  redis:
     image: redis:latest
     environment:
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
-    container_name: app-redis
-    hostname: app-redis
+    container_name: redis
+    hostname: redis
     networks:
       - app-network
     volumes:
@@ -88,3 +95,6 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  db_data:

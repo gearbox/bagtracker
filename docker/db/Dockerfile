@@ -1,1 +1,1 @@
-FROM postgres:17.2-alpine
+FROM timescale/timescaledb:latest-pg15
