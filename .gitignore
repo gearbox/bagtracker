@@ -1,0 +1,14 @@
+venv
+.venv
+*.conf
+**/__pycache__
+**/*.pyc
+.vscode
+.idea
+.DS_Store
+.git
+.eggs
+.env
+___*
+/docker/var/
+gunicorn.conf.py
