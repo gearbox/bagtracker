@@ -3,12 +3,13 @@ from functools import lru_cache
 
 from loguru import logger
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker, declarative_base
 
 from backend.settings import settings
 
 engine: Engine | None = None
 SessionLocal: sessionmaker | None = None
+Base = declarative_base()
 
 
 @lru_cache

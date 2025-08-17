@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     default_log_format: str = "[{time:%Y-%m-%d %H:%M:%S:%f %z}] - {name} - <level>{level}</level> - {message}"
     logging_level: str = "INFO"
 
+    # Web3
+    # "https://mainnet.infura.io/v3/<API_KEY>"
+    web3_provider: str | None = None
+
     # Override settings with OS ENV values
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
