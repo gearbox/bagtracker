@@ -1,6 +1,7 @@
 import datetime
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Float, DateTime
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, ForeignKey, Float, DateTime
 from sqlalchemy.orm import relationship
 
 from backend.databases.models import Base
@@ -32,7 +33,7 @@ class Wallet(Base):
 
     address = Column(String, index=True, unique=True)
     blockchain = Column(String, default="ethereum")
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="wallets")
     transactions = relationship("Transaction", back_populates="wallet")
@@ -50,7 +51,7 @@ class Wallet(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    wallet_id = Column(Integer, ForeignKey("wallets.id"))
+    wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id"))
     tx_hash = Column(String, index=True)
     asset_symbol = Column(String)
     amount = Column(Float)

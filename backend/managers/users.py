@@ -1,3 +1,4 @@
+import uuid
 from typing import TYPE_CHECKING
 
 from fastapi import Depends
@@ -17,32 +18,43 @@ class UserManager:
         self.db = db
 
     def create_user(self, user: schemas.UserCreate) -> User:
-        # db_user = User(**user.dict())
-        db_user = User(**user.model_dump())
-        self._user_save_or_raise(db_user)
-        return db_user
+        new_user = User(**user.model_dump())
+        existing_user = self.db.query(User).filter(User.email == new_user.email).first()
+        if existing_user:
+            raise UserError(status_code=400, exception_message="User with this email already exists")
+        self._user_save_or_raise(new_user)
+        return new_user
 
     def _user_save_or_raise(self, user: User) -> None:
         try:
             user.save(self.db)
         except sqlalchemy.exc.IntegrityError as e:
-            if "Duplicate entry" in str(e):
+            if "duplicate key value" in str(e):
                 pass
             else:
-                raise DatabaseError(status_code=500, exception_message="Database integrity error") from e
+                raise DatabaseError(status_code=500, exception_message=f"Database integrity error: {str(e)}") from e
         except sqlalchemy.exc.SQLAlchemyError as e:
-            raise DatabaseError(status_code=500, exception_message="Internal database error") from e
+            raise DatabaseError(status_code=500, exception_message=f"Internal database error: {str(e)}") from e
         except Exception as e:
-            raise DatabaseError(status_code=500, exception_message="Internal server error") from e
+            raise DatabaseError(status_code=500, exception_message=f"Internal server error: {str(e)}") from e
 
-    def get_user(self, user_id: int) -> User:
-        user = User.get(self.db, user_id)
+    def get_user(self, user_id: str) -> User:
+        user = User.get(self.db, uuid.UUID(user_id))
+        if not user:
+            raise UserError(status_code=404, exception_message="User not found")
+        return user
+    
+    def get_user_by_email(self, email: str) -> User:
+        user = self.db.query(User).filter(User.email == email).first()
         if not user:
             raise UserError(status_code=404, exception_message="User not found")
         return user
 
-    def delete_user(self, user_id: int) -> None:
-        user = User.get(self.db, user_id)
+    def get_all_users(self) -> list[User]:
+        return User.get_all(self.db)
+
+    def delete_user(self, user_id: str) -> None:
+        user = User.get(self.db, uuid.UUID(user_id))
         if not user:
             raise UserError(status_code=404, exception_message="User not found")
         user.delete(self.db)

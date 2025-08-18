@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel
 from typing import List
 
@@ -16,7 +18,11 @@ class UserCreate(UserBase):
 
 
 class User(UserBase):
-    id: int
+    id: uuid.UUID
     wallets: List[Wallet] = []
     class Config:
         from_attributes = True
+
+
+class UserAll(BaseModel):
+    users: List[User] = []
