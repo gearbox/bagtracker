@@ -1,27 +1,17 @@
 from collections.abc import Generator
-from functools import lru_cache
 
 from loguru import logger
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import Session, sessionmaker, declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 from backend.settings import settings
 
 engine: Engine | None = None
 SessionLocal: sessionmaker | None = None
-Base = declarative_base()
-
-
-@lru_cache
-def get_postgres_url() -> str:
-    return (
-        f"postgresql+psycopg2://{settings.postgres_user}:{settings.postgres_password}@"
-        f"{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
-    )
 
 
 def init_postgres() -> None:
-    db_url = get_postgres_url()
+    db_url = settings.db_url
     logger.debug(f"Initializing Postgres database with URL: {db_url}")
     global engine, SessionLocal
     try:

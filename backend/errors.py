@@ -43,3 +43,28 @@ class NotAuthorizedException(GeneralProcessingException):
     def __init__(self, response_text=None):
         if response_text:
             self.message = f"Failed to pass authorization. {response_text}"
+
+
+class DatabaseError(GeneralProcessingException):
+    """Database-related exception class"""
+
+    status_code = 500
+    message = "Database-related problem has occurred"
+
+    def __init__(self, status_code: int | None = None, exception_message: str | None = None):
+        if status_code:
+            self.status_code = status_code
+        if exception_message:
+            self.message = exception_message
+
+class UserError(GeneralProcessingException):
+    """User-related exception class"""
+
+    status_code = 404
+    message = "User not found"
+
+    def __init__(self, status_code: int | None = None, exception_message: str | None = None):
+        if status_code:
+            self.status_code = status_code
+        if exception_message:
+            self.message = exception_message
