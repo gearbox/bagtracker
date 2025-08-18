@@ -1,7 +1,8 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+# from sqlalchemy import engine_from_config
+# from sqlalchemy import pool
+from sqlalchemy import create_engine
 from alembic import context
 
 from backend.settings import settings
@@ -20,7 +21,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -29,12 +30,7 @@ target_metadata = None
 
 
 def get_db_url() -> str:
-    if db_url := config.get_main_option("sqlalchemy.url"):
-        return db_url
-    if settings.db_url:
-        return settings.db_url
-    raise SystemExit("Failed to find database uri in settings file.")
-
+    return config.get_main_option("sqlalchemy.url") or settings.db_url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -48,7 +44,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_db_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -67,11 +63,12 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # connectable = engine_from_config(
+    #     config.get_section(config.config_ini_section, {}),
+    #     prefix="sqlalchemy.",
+    #     poolclass=pool.NullPool,
+    # )
+    connectable = create_engine(get_db_url())
 
     with connectable.connect() as connection:
         context.configure(

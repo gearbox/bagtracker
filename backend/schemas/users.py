@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     email: str
     name: str | None = None
     last_name: str | None = None
+    nickname: str | None = None
 
 
 class UserCreate(UserBase):

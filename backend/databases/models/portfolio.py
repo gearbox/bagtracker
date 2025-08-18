@@ -11,6 +11,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
+    nickname = Column(String, nullable=True)
 
     wallets = relationship("Wallet", back_populates="owner")
 
@@ -20,6 +21,7 @@ class User(Base):
             "email": self.email,
             "name": self.name,
             "last_name": self.last_name,
+            "nickname": self.nickname,
             "wallets": [wallet.to_schema() for wallet in self.wallets]
         }
         return data

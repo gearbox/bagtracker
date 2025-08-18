@@ -73,3 +73,23 @@ To set up a development environment, follow these steps:
     ruff check --fix
     ruff format
     ```
+
+### Using Alembic for Migrations
+- To create a new migration:
+    ```shell
+    alembic revision --autogenerate -m "Your migration message"
+    ```
+
+- To apply migrations:
+    ```shell
+    alembic upgrade head
+    ```
+
+- To downgrade migrations:
+    ```shell
+    alembic downgrade -1
+    ```
+- To view the current migration status:
+    ```shell
+    alembic current
+    ```
