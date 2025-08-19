@@ -24,6 +24,10 @@ class Base(DeclarativeBase):
         return session.get(cls, item_id)
 
     @classmethod
+    def get_by_kwargs(cls, session: Session, **kwargs):
+        return session.query(cls).filter_by(**kwargs).first()
+
+    @classmethod
     def get_all(cls, session: Session) -> list:
         return session.query(cls).all()
 
@@ -34,3 +38,4 @@ class Base(DeclarativeBase):
         session.add(self)
         if commit:
             session.commit()
+        return self

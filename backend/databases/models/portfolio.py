@@ -9,7 +9,8 @@ from backend.databases.models import Base
 class User(Base):
     __tablename__ = "users"
 
-    email = Column(String, unique=True, index=True)
+    username = Column(String, max_length=50, nullable=False, unique=True, index=True)
+    email = Column(String, nullable=True, unique=True, index=True)
     name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     nickname = Column(String, nullable=True)
@@ -19,6 +20,7 @@ class User(Base):
     def to_schema(self) -> dict:
         data = {
             "id": self.id,
+            "username": self.username,
             "email": self.email,
             "name": self.name,
             "last_name": self.last_name,
