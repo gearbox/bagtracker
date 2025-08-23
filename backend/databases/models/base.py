@@ -26,6 +26,10 @@ class Base(DeclarativeBase):
     @classmethod
     def get_by_kwargs(cls, session: Session, **kwargs):
         return session.query(cls).filter_by(**kwargs).first()
+    
+    @classmethod
+    def get_many_by_kwargs(cls, session: Session, **kwargs):
+        return session.query(cls).filter_by(**kwargs).all()
 
     @classmethod
     def get_all(cls, session: Session) -> list:

@@ -18,6 +18,7 @@ class UserManager:
         self.db = db
 
     def create_user(self, user: schemas.UserCreateOrUpdate) -> User:
+        # TODO: check if we can remove the username presence from router and replace it with validator in schema
         if not user.username:
             raise UserError(status_code=400, exception_message="Username field is required")
         new_user = User(**user.model_dump())

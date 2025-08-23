@@ -3,19 +3,22 @@ import traceback
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from pydantic_core import ValidationError
 from loguru import logger
 
 
-async def handle_exception(request: Request, exc: Exception):
+async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
     code = 500
-    message = exc.message if hasattr(exc, "message") else str(exc.args)
+    message = str(exc.args)
     logger.error(traceback.format_exc())
     if isinstance(exc, GeneralProcessingException):
         code = exc.status_code
-    elif hasattr(exc, "errors"):
+        message = exc.message
+    elif isinstance(exc, ValidationError):
+        errors_kwargs = {"include_url": False}
         return JSONResponse(
             status_code=code,
-            content=jsonable_encoder({"detail": exc.errors(include_url=False)}),
+            content=jsonable_encoder({"detail": exc.errors(**errors_kwargs)}),
         )
     return JSONResponse(
         status_code=code,
@@ -62,6 +65,19 @@ class UserError(GeneralProcessingException):
 
     status_code = 404
     message = "User not found"
+
+    def __init__(self, status_code: int | None = None, exception_message: str | None = None):
+        if status_code:
+            self.status_code = status_code
+        if exception_message:
+            self.message = exception_message
+
+
+class WalletError(GeneralProcessingException):
+    """Wallet-related exception class"""
+
+    status_code = 400
+    message = "Wallet not found"
 
     def __init__(self, status_code: int | None = None, exception_message: str | None = None):
         if status_code:

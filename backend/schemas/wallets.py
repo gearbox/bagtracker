@@ -1,5 +1,7 @@
-from pydantic import BaseModel
+from uuid import UUID
 from typing import List
+
+from pydantic import BaseModel
 
 from backend.schemas import Transaction
 
@@ -12,7 +14,12 @@ class WalletCreate(WalletBase):
     pass
 
 class Wallet(WalletBase):
-    id: int
+    id: UUID
     transactions: List[Transaction] = []
+    
     class Config:
         from_attributes = True
+
+
+class WalletAll(BaseModel):
+    wallets: List[Wallet] = []

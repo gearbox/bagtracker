@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID
 
 from pydantic import BaseModel, ValidationInfo, field_validator
 from typing import List
@@ -46,7 +46,7 @@ class UserPatch(UserCreateOrUpdate):
 
 
 class User(UserBase):
-    id: uuid.UUID
+    id: UUID
     wallets: List[Wallet] = []
     class Config:
         from_attributes = True
