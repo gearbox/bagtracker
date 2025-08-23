@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from backend.dependencies import common, token_auth
-from backend.routers import healthcheck, info, eth, users, wallets
+from backend.routers import healthcheck, info, eth, users, wallets, transactions
 
 main_router = APIRouter(dependencies=common)
 main_router.include_router(healthcheck.router, tags=['Health check'])
@@ -9,3 +9,4 @@ main_router.include_router(info.router, tags=['Info'], dependencies=token_auth)
 main_router.include_router(eth.router, tags=['Ethereum'])
 main_router.include_router(users.router, tags=['Users'])
 main_router.include_router(wallets.router, tags=['Wallets'])
+main_router.include_router(transactions.router, tags=['Transactions'])

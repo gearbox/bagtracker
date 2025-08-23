@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends
 
-from backend.schemas import Wallet, WalletCreate, WalletAll
+from backend.schemas import Wallet, WalletCreate
 from backend.managers import WalletManager
 
 router = APIRouter()

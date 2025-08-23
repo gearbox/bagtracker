@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 import datetime
+from uuid import UUID
+
+from pydantic import BaseModel
 
 class TransactionBase(BaseModel):
     tx_hash: str
@@ -11,6 +13,6 @@ class TransactionCreate(TransactionBase):
     pass
 
 class Transaction(TransactionBase):
-    id: int
+    id: UUID
     class Config:
         from_attributes = True
