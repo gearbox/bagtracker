@@ -6,7 +6,7 @@ authors = ["Mihail Tayrov <mtayrov@gmail.com>"]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alembic>=1.16.4",
+    "alembic>=1.16.5",
     "fastapi[standard]>=0.116.1",
     "gunicorn>=23.0.0",
     "loguru>=0.7.3",

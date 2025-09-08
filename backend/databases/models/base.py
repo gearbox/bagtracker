@@ -3,12 +3,13 @@ import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Column
 from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.sql import func
 
 
 class Base(DeclarativeBase):
     __abstract__ = True
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
 
     def save(self, session: Session, commit: bool = True):
         session.add(self)

@@ -1,4 +1,4 @@
-name: bagtracker
+name: $COMPOSE_PROJECT_NAME
 services:
   app-backend:
     environment:
@@ -40,6 +40,10 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    entrypoint: [
+      "/bin/bash", "-c", 
+      "alembic upgrade head && gunicorn -w $UVICORN_WORKERS -k uvicorn.workers.UvicornWorker -b $BACKEND_HOST:$BACKEND_PORT --timeout 180 --access-logfile - --error-logfile - backend.asgi:app"
+    ]
     restart: always
 
   db:

@@ -89,7 +89,36 @@ To set up a development environment, follow these steps:
     ```shell
     alembic downgrade -1
     ```
+    or
+    ```
+    alembic downgrade base
+    ```
+
 - To view the current migration status:
     ```shell
     alembic current
+    ```
+
+### Seeding the Database
+To seed the database with initial data, use the following command:
+```shell
+python -m backend.seeds.seed <table_name> <action>
+```
+Replace `<table_name>` with the name of the table you want to seed (e.g., `users`, `chains`, `tokens`), now supports `chains`.
+You can write your own seeders in the `backend/seeds/data` directory.
+
+Replace `<action>` with the desired action (supporting `seed`, `clear`, `status`).
+
+For example:
+- to seed the `chains` table, run:
+    ```shell
+    python -m backend.seeds.seed chains seed
+    ```
+- to clear the `chains` table, run:
+    ```shell
+    python -m backend.seeds.seed chains clear
+    ```
+- to check the status of the `chains` table, run:
+    ```shell
+    python -m backend.seeds.seed chains status
     ```

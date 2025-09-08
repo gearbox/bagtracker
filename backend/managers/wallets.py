@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from fastapi import Depends
 import sqlalchemy.exc
 
-from backend.databases.postgres import get_db_session
+from backend.databases import get_db_session
 from backend.databases.models import Wallet, User
 from backend import schemas
 from backend.errors import DatabaseError, UserError, WalletError

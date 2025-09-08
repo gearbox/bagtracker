@@ -13,6 +13,7 @@ ENV UV_COMPILE_BYTECODE=1
 # Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
 
+ADD ./alembic.ini /app/alembic.ini
 ADD ./backend /app/backend
 # Install the project's dependencies using the lockfile and settings
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -38,4 +39,4 @@ ENTRYPOINT []
 
 #CMD ["fastapi", "run", "backend/asgi.py", "--proxy-headers", "--port", "80"]
 #CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:80", "--timeout", "180", "--access-logfile", "-", "--error-logfile", "-", "backend.asgi:app"]
-CMD gunicorn -w $UVICORN_WORKERS -k uvicorn.workers.UvicornWorker -b $BACKEND_HOST:$BACKEND_PORT --timeout 180 --access-logfile - --error-logfile - backend.asgi:app
+# CMD gunicorn -w $UVICORN_WORKERS -k uvicorn.workers.UvicornWorker -b $BACKEND_HOST:$BACKEND_PORT --timeout 180 --access-logfile - --error-logfile - backend.asgi:app

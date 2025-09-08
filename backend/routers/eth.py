@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, Response
-from fastapi import status as status_code
+from fastapi import APIRouter, Depends
 
 from backend.managers import EthereumManager
 

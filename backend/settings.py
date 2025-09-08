@@ -21,6 +21,11 @@ class Web3Providers(str, Enum):
     AVALANCHE_TESTNET = "https://api.avax-test.network/ext/bc/C/rpc"
 
 
+class DBType(str, Enum):
+    POSTGRESQL = "postgres"
+    MARIADB = "mariadb"
+
+
 class Settings(BaseSettings):
     # Swagger
     openapi_url: str = "/openapi.json"
@@ -66,6 +71,10 @@ class Settings(BaseSettings):
             f"{self.db_driver}://{self.postgres_user}:{self.postgres_password}@"
             f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def db_type(self) -> str:
+        return DBType[self.db_driver.split("+")[0].upper()].value
 
 
 @lru_cache

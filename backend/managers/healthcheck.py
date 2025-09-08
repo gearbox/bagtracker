@@ -6,7 +6,7 @@ from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 
-from backend.databases import postgres, redis
+from backend.databases import get_db_session, get_redis_client
 from backend.schemas import APIHealthCheck, DBHealthCheck
 from backend.settings import settings
 
@@ -15,8 +15,8 @@ class HealthCheckManager:
     def __init__(
         self,
         request: Request,
-        db: DBSession = Depends(postgres.get_db_session),
-        redis_client: Redis = Depends(redis.get_client),
+        db: DBSession = Depends(get_db_session),
+        redis_client: Redis = Depends(get_redis_client),
     ) -> None:
         self.db = db
         self.app = request.app
@@ -24,10 +24,11 @@ class HealthCheckManager:
 
     def get_api_status(self) -> APIHealthCheck:
         try:
+            start_time = self.app.state.start_time
             return APIHealthCheck(
                 status=True,
-                start_time=self.app.state.start_time,
-                uptime_sec=int((datetime.now(UTC) - self.app.state.start_time).total_seconds()),
+                start_time=start_time,
+                uptime_sec=int((datetime.now(UTC) - start_time).total_seconds()),
             )
         except Exception as e:
             error_message = f"API healthcheck failed with error: {e}"
