@@ -1,11 +1,11 @@
 import argparse
-from importlib import import_module
 from abc import ABC, abstractmethod
+from importlib import import_module
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from backend.databases.factory import init_database, get_db_instance
+from backend.databases.factory import get_db_instance, init_database
 from backend.settings import settings
 
 

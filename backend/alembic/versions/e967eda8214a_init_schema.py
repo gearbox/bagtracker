@@ -1,21 +1,20 @@
 """init schema
 
-Revision ID: 90c6fb778389
+Revision ID: e967eda8214a
 Revises: 
-Create Date: 2025-09-08 00:16:23.166778
+Create Date: 2025-09-19 17:15:33.433623
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '90c6fb778389'
-down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = 'e967eda8214a'
+down_revision: str | Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -29,29 +28,82 @@ def upgrade() -> None:
     sa.Column('chain_id', sa.Integer(), nullable=True),
     sa.Column('native_symbol', sa.String(length=10), nullable=False),
     sa.Column('explorer_url', sa.Text(), nullable=True),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
+    )
+    op.create_table('exchanges',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=50), nullable=False),
+    sa.Column('display_name', sa.String(length=100), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
     op.create_table('users',
     sa.Column('username', sa.String(length=50), nullable=False),
-    sa.Column('password_hash', sa.Text(), nullable=True),
+    sa.Column('password', sa.Text(), nullable=True),
     sa.Column('email', sa.Text(), nullable=True),
     sa.Column('name', sa.String(length=50), nullable=True),
     sa.Column('last_name', sa.String(length=50), nullable=True),
     sa.Column('nickname', sa.String(length=50), nullable=True),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email', name='users_email_key')
     )
     op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
+    op.create_table('cex_accounts',
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('exchange_id', sa.Integer(), nullable=False),
+    sa.Column('api_key', sa.String(length=255), nullable=True),
+    sa.Column('api_secret', sa.String(length=255), nullable=True),
+    sa.Column('passphrase', sa.String(length=255), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
+    sa.ForeignKeyConstraint(['exchange_id'], ['exchanges.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('portfolios',
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('cex_subaccounts',
+    sa.Column('account_id', sa.UUID(), nullable=False),
+    sa.Column('type', sa.String(length=50), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
+    sa.ForeignKeyConstraint(['account_id'], ['cex_accounts.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('wallets',
+    sa.Column('name', sa.String(length=100), nullable=True),
     sa.Column('type', sa.String(length=20), nullable=False),
     sa.Column('address', sa.String(length=100), nullable=False),
     sa.Column('chain_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=True),
+    sa.Column('portfolio_id', sa.UUID(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.ForeignKeyConstraint(['chain_id'], ['chains.id'], ),
+    sa.ForeignKeyConstraint(['portfolio_id'], ['portfolios.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -60,6 +112,8 @@ def upgrade() -> None:
     op.create_table('balances',
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.Column('wallet_id', sa.UUID(), nullable=False),
     sa.Column('contract_address', sa.String(length=200), nullable=True),
     sa.Column('chain_id', sa.Integer(), nullable=False),
@@ -68,6 +122,7 @@ def upgrade() -> None:
     sa.Column('decimals', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
     sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
     sa.Column('type', sa.String(length=20), nullable=True),
     sa.ForeignKeyConstraint(['chain_id'], ['chains.id'], ),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
@@ -78,6 +133,8 @@ def upgrade() -> None:
     op.create_table('balances_history',
     sa.Column('fetched_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.Column('wallet_id', sa.UUID(), nullable=False),
     sa.Column('contract_address', sa.String(length=200), nullable=True),
     sa.Column('chain_id', sa.Integer(), nullable=False),
@@ -86,6 +143,7 @@ def upgrade() -> None:
     sa.Column('decimals', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
     sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
     sa.Column('type', sa.String(length=20), nullable=True),
     sa.ForeignKeyConstraint(['chain_id'], ['chains.id'], ),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
@@ -93,9 +151,43 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_balances_history_chain_id'), 'balances_history', ['chain_id'], unique=False)
     op.create_index(op.f('ix_balances_history_fetched_at'), 'balances_history', ['fetched_at'], unique=False)
+    op.create_table('cex_balances',
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
+    sa.Column('subaccount_id', sa.UUID(), nullable=False),
+    sa.Column('symbol', sa.String(length=20), nullable=True),
+    sa.Column('name', sa.String(length=100), nullable=True),
+    sa.Column('decimals', sa.Integer(), nullable=False),
+    sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
+    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.ForeignKeyConstraint(['subaccount_id'], ['cex_subaccounts.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('subaccount_id', 'symbol', name='uq_cex_balance_subaccount_symbol')
+    )
+    op.create_table('cex_balances_history',
+    sa.Column('fetched_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
+    sa.Column('subaccount_id', sa.UUID(), nullable=False),
+    sa.Column('symbol', sa.String(length=20), nullable=True),
+    sa.Column('name', sa.String(length=100), nullable=True),
+    sa.Column('decimals', sa.Integer(), nullable=False),
+    sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
+    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.ForeignKeyConstraint(['subaccount_id'], ['cex_subaccounts.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('fetched_at', 'id')
+    )
+    op.create_index(op.f('ix_cex_balances_history_fetched_at'), 'cex_balances_history', ['fetched_at'], unique=False)
     op.create_table('nft_balances',
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.Column('wallet_id', sa.UUID(), nullable=False),
     sa.Column('contract_address', sa.String(length=200), nullable=False),
     sa.Column('collection_name', sa.String(length=100), nullable=True),
@@ -112,6 +204,8 @@ def upgrade() -> None:
     op.create_table('nft_balances_history',
     sa.Column('fetched_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.Column('wallet_id', sa.UUID(), nullable=False),
     sa.Column('contract_address', sa.String(length=200), nullable=False),
     sa.Column('collection_name', sa.String(length=100), nullable=True),
@@ -133,15 +227,18 @@ def upgrade() -> None:
     sa.Column('fee', sa.Float(), nullable=True),
     sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
+    sa.Column('memo', sa.Text(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_transactions_tx_hash'), 'transactions', ['tx_hash'], unique=False)
     # ### end Alembic commands ###
-    
+
     # Turn balances_history and nft_balances_history into hypertables
     op.execute("SELECT create_hypertable('balances_history', 'fetched_at', if_not_exists => TRUE)")
     op.execute("SELECT create_hypertable('nft_balances_history', 'fetched_at', if_not_exists => TRUE)")
+    op.execute("SELECT create_hypertable('cex_balances_history', 'fetched_at', if_not_exists => TRUE)")
 
 
 def downgrade() -> None:
@@ -152,6 +249,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_nft_balances_history_fetched_at'), table_name='nft_balances_history')
     op.drop_table('nft_balances_history')
     op.drop_table('nft_balances')
+    op.drop_index(op.f('ix_cex_balances_history_fetched_at'), table_name='cex_balances_history')
+    op.drop_table('cex_balances_history')
+    op.drop_table('cex_balances')
     op.drop_index(op.f('ix_balances_history_fetched_at'), table_name='balances_history')
     op.drop_index(op.f('ix_balances_history_chain_id'), table_name='balances_history')
     op.drop_table('balances_history')
@@ -160,7 +260,11 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_wallets_chain_id'), table_name='wallets')
     op.drop_index(op.f('ix_wallets_address'), table_name='wallets')
     op.drop_table('wallets')
+    op.drop_table('cex_subaccounts')
+    op.drop_table('portfolios')
+    op.drop_table('cex_accounts')
     op.drop_index(op.f('ix_users_username'), table_name='users')
     op.drop_table('users')
+    op.drop_table('exchanges')
     op.drop_table('chains')
     # ### end Alembic commands ###

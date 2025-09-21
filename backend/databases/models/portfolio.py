@@ -1,23 +1,26 @@
 import datetime
 
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Column, String, Text, ForeignKey, Float, DateTime, Integer, Numeric, JSON, UniqueConstraint
-from sqlalchemy.orm import relationship, declarative_mixin
+from sqlalchemy.orm import declarative_mixin, relationship
 from sqlalchemy.sql import func
 
 from backend.databases.models import Base
+
 
 class User(Base):
     __tablename__ = "users"
 
     username = Column(String(50), nullable=False, unique=True, index=True)
-    password_hash = Column(Text, nullable=True)
+    password = Column(Text, nullable=True)
     email = Column(Text, nullable=True)
     name = Column(String(50), nullable=True)
     last_name = Column(String(50), nullable=True)
     nickname = Column(String(50), nullable=True)
 
-    wallets = relationship("Wallet", back_populates="owner")
+    wallets = relationship("Wallet", back_populates="owner", cascade="all, delete-orphan")
+    portfolios = relationship("Portfolio", back_populates="owner", cascade="all, delete-orphan")
+    cex_accounts = relationship("CexAccount", back_populates="owner", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("email", name="users_email_key"),
@@ -31,23 +34,34 @@ class User(Base):
             "name": self.name,
             "last_name": self.last_name,
             "nickname": self.nickname,
+            "memo": self.memo,
             "wallets": [wallet.to_schema() for wallet in self.wallets],
+            "portfolios": [portfolio.to_schema() for portfolio in self.portfolios],
         }
 
 
 class Chain(Base):
-    # Chains table example:
-    # | id | name         | name_full           | chain_type | chain_id  | native_symbol | explorer_url                |
-    # | -- | ------------ | ------------------- | ---------- | --------- | ------------- | --------------------------- |
-    # | 1  | eth-mainnet  | Ethereum Mainnet    | evm        | 1         | ETH           | https://etherscan.io/       |
-    # | 2  | bsc-mainnet  | Binance Smart Chain | evm        | 56        | BNB           | https://bscscan.com/        |
-    # | 3  | tron-mainnet | Tron Mainnet        | non-evm    | 728126428 | TRX           | https://tronscan.org/       |
-    # | 4  | stx-mainnet  | Stacks Mainnet      | non-evm    | 5757      | STX           | https://explorer.hiro.so |
+    """
+    Blockchain networks supported, e.g. Ethereum Mainnet, BSC, Tron, Stacks, Solana, etc.
+    Used to link wallets and tokens to specific chains.
+    Each chain has a unique numeric chain_id (for EVM chains) or native identifier.
+    
+    Chains table example:
+
+    | id | name         | name_full           | chain_type | chain_id  | native_symbol | explorer_url                |
+    | -- | ------------ | ------------------- | ---------- | --------- | ------------- | --------------------------- |
+    | 1  | eth-mainnet  | Ethereum Mainnet    | evm        | 1         | ETH           | https://etherscan.io/       |
+    | 2  | bsc-mainnet  | Binance Smart Chain | evm        | 56        | BNB           | https://bscscan.com/        |
+    | 3  | tron-mainnet | Tron Mainnet        | non-evm    | 728126428 | TRX           | https://tronscan.org/       |
+    | 4  | stx-mainnet  | Stacks Mainnet      | non-evm    | 5757      | STX           | https://explorer.hiro.so    |
+    | 5  | sol-mainnet  | Solana Mainnet      | non-evm    | None      | SOL           | https://explorer.solana.com/|
+
+    """
 
     __tablename__ = "chains"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(50), unique=True, nullable=False)  # short identifier, e.g. "eth-mainnet", "bsc-mainnet", "tron-mainnet"
+    name = Column(String(50), unique=True, nullable=False)  # short identifier, e.g. "eth-mainnet", "bsc-mainnet", etc
     name_full = Column(Text, nullable=True)  # Human-readable name: "Ethereum Mainnet", "Binance Smart Chain"
     chain_type = Column(String(50), nullable=False)  # "evm", "bitcoin", "tron", "stacks", "solana" etc.
     chain_id = Column(Integer, nullable=True)  # EVM: numeric (as str, e.g. "1", "56", "137"), others: null or native id
@@ -63,20 +77,44 @@ class Chain(Base):
             "chain_id": self.chain_id,
             "native_symbol": self.native_symbol,
             "explorer_url": self.explorer_url,
+            "memo": self.memo,
+        }
+
+
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+
+    name = Column(String(100), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    owner = relationship("User", back_populates="portfolios")
+    wallets = relationship("Wallet", back_populates="portfolio")
+
+    def to_schema(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "memo": self.memo,
+            "created_at": self.created_at,
+            "wallets": [wallet.to_schema() for wallet in self.wallets],
         }
 
 
 class Wallet(Base):
     __tablename__ = "wallets"
 
+    name = Column(String(100), nullable=True)  # optional user-defined name
     type = Column(String(20), nullable=False)  # metamask, ledger, tronlink
     address = Column(String(100), nullable=False, index=True, unique=True)
     chain_id = Column(Integer, ForeignKey("chains.id"), nullable=False, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     owner = relationship("User", back_populates="wallets")
     chain = relationship("Chain", backref="wallets")
+    portfolio = relationship("Portfolio", back_populates="wallets")
     transactions = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan")
     balances = relationship("Balance", back_populates="wallet", cascade="all, delete-orphan")
     balances_history = relationship("BalanceHistory", back_populates="wallet", cascade="all, delete-orphan")
@@ -86,9 +124,14 @@ class Wallet(Base):
     def to_schema(self) -> dict:
         return {
             "id": self.id,
+            "name": self.name,
+            "memo": self.memo,
+            "created_at": self.created_at,
             "type": self.type,
             "address": self.address,
             "chain": self.chain.to_schema() if self.chain else None,
+            "balances": [balance.to_schema() for balance in self.balances],
+            "nft_balances": [nft.to_schema() for nft in self.nft_balances],
             "transactions": [tx.to_schema() for tx in self.transactions],
         }
 
@@ -101,7 +144,7 @@ class Transaction(Base):
     symbol = Column(String(20))
     amount = Column(Float)
     fee = Column(Float, nullable=True)
-    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
 
     wallet = relationship("Wallet", back_populates="transactions")
 
@@ -113,6 +156,7 @@ class Transaction(Base):
             "symbol": self.symbol,
             "amount": self.amount,
             "fee": self.fee,
+            "memo": self.memo,
             "timestamp": self.timestamp,
         }
 
@@ -125,8 +169,9 @@ class BalanceBase:
     symbol = Column(String(20), nullable=True)
     name = Column(String(100), nullable=True)
     decimals = Column(Integer, nullable=False, default=18)
-    amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance,store as integer
+    amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
     usd_value = Column(Numeric(precision=20, scale=4), nullable=True)
+    avg_usd_value = Column(Numeric(precision=20, scale=4), nullable=True)  # average purchase price per token
     type = Column(String(20), nullable=True)  # native | erc20 | nft
 
     def to_schema(self) -> dict:
@@ -139,6 +184,7 @@ class BalanceBase:
             "decimals": self.decimals,
             "amount": self.amount,
             "usd_value": self.usd_value,
+            "avg_usd_value": self.avg_usd_value,
             "type": self.type,
         }
 
@@ -158,6 +204,7 @@ class Balance(Base, BalanceBase):
     def to_schema(self) -> dict:
         return {
             "id": self.id,
+            "memo": self.memo,
             "updated_at": self.updated_at,
             **super().to_schema(),
         }
@@ -166,7 +213,9 @@ class Balance(Base, BalanceBase):
 class BalanceHistory(Base, BalanceBase):
     __tablename__ = "balances_history"
 
-    fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True)
+    fetched_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+    )
 
     wallet = relationship("Wallet", back_populates="balances_history")
     chain = relationship("Chain", backref="balances_history")
@@ -219,6 +268,7 @@ class NFTBalance(Base, NFTBalanceBase):
     def to_schema(self) -> dict:
         return {
             "id": self.id,
+            "memo": self.memo,
             "updated_at": self.updated_at,
             **super().to_schema(),
         }
@@ -227,13 +277,121 @@ class NFTBalance(Base, NFTBalanceBase):
 class NFTBalanceHistory(Base, NFTBalanceBase):
     __tablename__ = "nft_balances_history"
 
-    fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True)
+    fetched_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+    )
 
     wallet = relationship("Wallet", back_populates="nft_balances_history")
 
     def to_schema(self) -> dict:
         return {
             "id": self.id,
+            "fetched_at": self.fetched_at,
+            **super().to_schema(),
+        }
+
+
+class Exchange(Base):
+    __tablename__ = "exchanges"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True, nullable=False)  # e.g. "bybit"
+    display_name = Column(String(100), nullable=True)      # e.g. "Bybit"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    accounts = relationship("CexAccount", back_populates="exchange", cascade="all, delete-orphan")
+
+
+class CexAccount(Base):
+    __tablename__ = "cex_accounts"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    exchange_id = Column(Integer, ForeignKey("exchanges.id"), nullable=False)
+
+    # For API keys, etc
+    api_key = Column(String(255), nullable=True)
+    api_secret = Column(String(255), nullable=True)
+    passphrase = Column(String(255), nullable=True)  # e.g. for HTX
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    owner = relationship("User", back_populates="cex_accounts")
+    exchange = relationship("Exchange", back_populates="accounts")
+    subaccounts = relationship("CexSubAccount", back_populates="account", cascade="all, delete-orphan")
+
+
+class CexSubAccount(Base):
+    __tablename__ = "cex_subaccounts"
+
+    account_id = Column(UUID(as_uuid=True), ForeignKey("cex_accounts.id"), nullable=False)
+    type = Column(String(50), nullable=False)  # e.g. "spot", "funding", "earn", "futures"
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    account = relationship("CexAccount", back_populates="subaccounts")
+    balances = relationship("CexBalance", back_populates="subaccount", cascade="all, delete-orphan")
+    balances_history = relationship("CexBalanceHistory", back_populates="subaccount", cascade="all, delete-orphan")
+
+
+@declarative_mixin
+class CexBalanceBase:
+    subaccount_id = Column(UUID(as_uuid=True), ForeignKey("cex_subaccounts.id", ondelete="CASCADE"), nullable=False)
+    symbol = Column(String(20), nullable=True)  # e.g. "USDT", "BTC"
+    name = Column(String(100), nullable=True)
+    decimals = Column(Integer, nullable=False, default=18)
+    amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
+    usd_value = Column(Numeric(precision=20, scale=4), nullable=True)
+    avg_usd_value = Column(Numeric(precision=20, scale=4), nullable=True)  # average purchase price per token
+
+    def to_schema(self) -> dict:
+        return {
+            "subaccount_id": self.subaccount_id,
+            "symbol": self.symbol,
+            "name": self.name,
+            "decimals": self.decimals,
+            "amount": self.amount,
+            "usd_value": self.usd_value,
+            "avg_usd_value": self.avg_usd_value,
+        }
+
+
+class CexBalance(Base, CexBalanceBase):
+    __tablename__ = "cex_balances"
+
+    # amount = Column(Numeric(38, 18), nullable=False, default=0)
+
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    subaccount = relationship("CexSubAccount", back_populates="balances")
+
+    __table_args__ = (
+        UniqueConstraint("subaccount_id", "symbol", name="uq_cex_balance_subaccount_symbol"),
+    )
+
+    def to_schema(self) -> dict:
+        return {
+            "id": self.id,
+            "memo": self.memo,
+            "updated_at": self.updated_at,
+            **super().to_schema(),
+        }
+
+
+class CexBalanceHistory(Base, CexBalanceBase):
+    __tablename__ = "cex_balances_history"
+
+    # amount = Column(Numeric(38, 18), nullable=False, default=0)
+
+    fetched_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+    )
+
+    subaccount = relationship("CexSubAccount", back_populates="balances_history")
+
+    def to_schema(self) -> dict:
+        return {
+            "id": self.id,
+            "memo": self.memo,
             "fetched_at": self.fetched_at,
             **super().to_schema(),
         }

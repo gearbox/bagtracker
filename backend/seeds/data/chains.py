@@ -2,7 +2,6 @@ from sqlalchemy import text
 
 from backend.seeds.seed import SeederBase
 
-
 CHAINS = [
     {
         "id": 1,

@@ -3,8 +3,8 @@ import traceback
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic_core import ValidationError
 from loguru import logger
+from pydantic_core import ValidationError
 
 
 async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
@@ -32,55 +32,59 @@ class GeneralProcessingException(Exception):
     message = "Unknown backend problem have happened"
     status_code = 500
 
-    def __init__(self, response_text=None):
-        if response_text:
-            self.message = f"{response_text}"
+    def __init__(self, status_code: int | None = None, exception_message: str | None = None):
+        if status_code:
+            self.status_code = status_code
+        if exception_message:
+            self.message = exception_message
+
+
+class UnexpectedException(GeneralProcessingException):
+    """Unexpected exception class"""
+
+    message = "Unexpected problem has occurred"
+    status_code = 500
+
+    def __init__(self, exception_message=None):
+        super().__init__(status_code=500, exception_message=exception_message)
 
 
 class NotAuthorizedException(GeneralProcessingException):
-    """Authorisation exception class"""
+    """Authorization exception class"""
 
     message = "Invalid authorization problem"
     status_code = 403
 
-    def __init__(self, response_text=None):
-        if response_text:
-            self.message = f"Failed to pass authorization. {response_text}"
+    def __init__(self, exception_message=None):
+        if exception_message:
+            self.message = f"Failed to pass authorization. {exception_message}"
 
 
 class DatabaseError(GeneralProcessingException):
     """Database-related exception class"""
 
-    status_code = 500
     message = "Database-related problem has occurred"
+    status_code = 500
 
     def __init__(self, status_code: int | None = None, exception_message: str | None = None):
-        if status_code:
-            self.status_code = status_code
-        if exception_message:
-            self.message = exception_message
+        super().__init__(status_code=status_code, exception_message=exception_message)
+
 
 class UserError(GeneralProcessingException):
     """User-related exception class"""
 
-    status_code = 404
     message = "User not found"
+    status_code = 404
 
     def __init__(self, status_code: int | None = None, exception_message: str | None = None):
-        if status_code:
-            self.status_code = status_code
-        if exception_message:
-            self.message = exception_message
+        super().__init__(status_code=status_code, exception_message=exception_message)
 
 
 class WalletError(GeneralProcessingException):
     """Wallet-related exception class"""
 
-    status_code = 400
     message = "Wallet not found"
+    status_code = 400
 
     def __init__(self, status_code: int | None = None, exception_message: str | None = None):
-        if status_code:
-            self.status_code = status_code
-        if exception_message:
-            self.message = exception_message
+        super().__init__(status_code=status_code, exception_message=exception_message)

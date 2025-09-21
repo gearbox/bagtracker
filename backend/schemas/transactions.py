@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+
 class TransactionBase(BaseModel):
     tx_hash: str
     asset_symbol: str

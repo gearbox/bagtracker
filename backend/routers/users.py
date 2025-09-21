@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, Response
 from fastapi import status as status_code
 
 from backend import schemas
-from backend.managers import UserManager
 from backend.dependencies import token_auth
+from backend.managers import UserManager
 
 router = APIRouter()
 
@@ -43,23 +43,33 @@ def delete_user(
     username: str, 
     user_manager: UserManager = Depends(UserManager)
 ) -> Response:
-    user_manager.delete_user(username)
+    user_manager.delete(username)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)
 
 
 # User Management
 #################
 
-@router.get("/user-management/users", tags=["User Management"], dependencies=token_auth, response_model=schemas.UserAll)
+@router.get(
+        "/user-management/users", 
+        tags=["User Management"], 
+        dependencies=token_auth, 
+        response_model=schemas.UserAll
+)
 def get_all_users(
     user_manager: UserManager = Depends(UserManager),
 ) -> schemas.UserAll:
-    return schemas.UserAll.model_validate({"users": [user.to_schema() for user in user_manager.get_all_users()]})
+    return schemas.UserAll.model_validate({"users": user_manager.get_all()})
 
-@router.delete("/user-management/user/{user_id}", tags=["User Management"], dependencies=token_auth, status_code=status_code.HTTP_204_NO_CONTENT)
+@router.delete(
+        "/user-management/user/{user_id}", 
+        tags=["User Management"], 
+        dependencies=token_auth, 
+        status_code=status_code.HTTP_204_NO_CONTENT,
+)
 def delete_user_by_id(
     user_id: str,
     user_manager: UserManager = Depends(UserManager),
 ) -> Response:
-    user_manager.delete_user(user_id)
+    user_manager.delete(user_id)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)

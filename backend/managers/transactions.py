@@ -1,11 +1,11 @@
 from typing import TYPE_CHECKING
 
-from fastapi import Depends
 import sqlalchemy.exc
+from fastapi import Depends
 
+from backend import schemas
 from backend.databases import get_db_session
 from backend.databases.models import Transaction
-from backend import schemas
 from backend.errors import DatabaseError
 
 if TYPE_CHECKING:

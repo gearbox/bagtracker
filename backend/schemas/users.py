@@ -1,10 +1,9 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ValidationInfo, field_validator
-from typing import List
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
-from backend.validators import is_uuid
 from backend.schemas import Wallet
+from backend.validators import is_uuid
 
 
 class UserBase(BaseModel):
@@ -13,6 +12,8 @@ class UserBase(BaseModel):
     name: str | None = None
     last_name: str | None = None
     nickname: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserCreateOrUpdate(UserBase):
@@ -47,10 +48,10 @@ class UserPatch(UserCreateOrUpdate):
 
 class User(UserBase):
     id: UUID
-    wallets: List[Wallet] = []
-    class Config:
-        from_attributes = True
+    wallets: list[Wallet] = []
+    portfolios: list = []
+    cex_accounts: list = []
 
 
 class UserAll(BaseModel):
-    users: List[User] = []
+    users: list[User] = []

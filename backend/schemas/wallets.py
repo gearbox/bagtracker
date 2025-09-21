@@ -1,31 +1,47 @@
-from uuid import UUID
-from typing import List
 from datetime import datetime
+from enum import Enum
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from backend.schemas import Transaction
+from backend.schemas import Chain, Transaction
+
+
+class WalletType(Enum):
+    METAMASK = "metamask"
+    TRONLINK = "tronlink"
+    LEATHER = "leather"
 
 
 class WalletBase(BaseModel):
+    name: str | None = None
+    type: WalletType = WalletType.METAMASK
     address: str
-    blockchain: str = "ethereum"
-    type: str
+    memo: str | None = None
 
-class WalletCreate(WalletBase):
-    pass
+    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+
+
+class WalletCreateOrUpdate(WalletBase):
+    chain_id: int = 1  # Default to Ethereum Mainnet
+
+
+class WalletPatch(BaseModel):
+    name: str | None = None
+    type: WalletType | None = None
+    address: str | None = None
+    memo: str | None = None
+    chain_id: int | None = None
+
+    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+
 
 class Wallet(WalletBase):
     id: UUID
-    address: str
-    blockchain: str = "ethereum"
-    type: str
     created_at: datetime
-    transactions: List[Transaction] = []
-    
-    class Config:
-        from_attributes = True
+    transactions: list[Transaction] = []
+    chain: Chain | None = None
 
 
 class WalletAll(BaseModel):
-    wallets: List[Wallet] = []
+    wallets: list[Wallet] = []

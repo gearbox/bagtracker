@@ -1,11 +1,10 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 from sqlalchemy.orm import Session
 
 from backend.databases.base import BaseDatabase
-from backend.databases.postgres import PostgresDatabase
 from backend.databases.mariadb import MariaDatabase
-
+from backend.databases.postgres import PostgresDatabase
 
 _db_instance: BaseDatabase | None = None
 

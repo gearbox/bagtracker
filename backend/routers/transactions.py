@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from backend.schemas import Transaction, TransactionCreate
 from backend.managers import TransactionManager
+from backend.schemas import Transaction, TransactionCreate
 
 router = APIRouter()
 

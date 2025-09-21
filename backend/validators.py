@@ -1,9 +1,10 @@
 import uuid
 
-def get_uuid(value: str) -> uuid.UUID | None:
+
+def get_uuid(value) -> uuid.UUID | None:
     try:
         return uuid.UUID(value)
-    except ValueError:
+    except (ValueError, AttributeError):
         return None
 
 def is_uuid(value: str) -> bool:

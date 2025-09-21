@@ -1,13 +1,13 @@
 from loguru import logger
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from backend.databases.base import BaseDatabase
 
 
 class MariaDatabase(BaseDatabase):
     def init_db(self) -> None:
-        logger.debug(f"Initializing MariaDB database...")
+        logger.debug("Initializing MariaDB database...")
         try:
             self.engine = create_engine(self.db_url)
             self.SessionLocal = sessionmaker(bind=self.engine)
