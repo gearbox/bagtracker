@@ -39,6 +39,13 @@ class GeneralProcessingException(Exception):
             self.message = exception_message
 
 
+class BadRequestException(GeneralProcessingException):
+    """Bad request exception class"""
+
+    message = "Bad request problem has occurred"
+    status_code = 400
+
+
 class UnexpectedException(GeneralProcessingException):
     """Unexpected exception class"""
 

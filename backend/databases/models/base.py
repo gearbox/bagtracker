@@ -23,8 +23,9 @@ class Base(DeclarativeBase):
         session.commit()
 
     @classmethod
-    def get(cls, session: Session, item_id: uuid.UUID | int):
-        return session.get(cls, item_id)
+    def get(cls, session: Session, item_id: uuid.UUID | int | None):
+        if item_id:
+            return session.get(cls, item_id)
 
     @classmethod
     def get_by_kwargs(cls, session: Session, **kwargs):

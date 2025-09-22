@@ -1,10 +1,12 @@
 import contextlib
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import sqlalchemy.exc
+from fastapi import Depends
 
 from backend import schemas
+from backend.databases import get_db_session
 from backend.databases.models import Base, User
 from backend.errors import DatabaseError, UnexpectedException, UserError
 from backend.validators import get_uuid, is_uuid
@@ -12,20 +14,20 @@ from backend.validators import get_uuid, is_uuid
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session as DBSession
 
-type ModelType = type[Base]
+T = TypeVar('T', bound=Base)
 
 
-class BaseCRUDManager(ABC):
+class BaseCRUDManager(ABC, Generic[T]):
 
-    def __init__(self, db: "DBSession") -> None:
+    def __init__(self, db: "DBSession" = Depends(get_db_session)) -> None:
         self.db = db
-        self.model: ModelType = self._get_db_model()  # This should be set in subclasses
+        self.model = self._model_class
         if not self.model:
             raise NotImplementedError("Subclasses must define a model.")
 
-
+    @property
     @abstractmethod
-    def _get_db_model(self) -> ModelType:
+    def _model_class(self) -> type[T]:
         pass
     
     def _save_or_raise(self, obj: Base) -> None:
@@ -54,7 +56,7 @@ class BaseCRUDManager(ABC):
     def _without_none_values(self, data: dict) -> dict:
         return {k: v for k, v in data.items() if v is not None}
 
-    def create(self, obj_data: schemas.BaseModel, for_username_or_id: str | None = None) -> Base:
+    def create(self, obj_data: schemas.BaseModel, for_username_or_id: str | None = None) -> T:
         create_dict = obj_data.model_dump(exclude_unset=True)
         with contextlib.suppress(KeyError):
             self._error_if_exists(create_dict["id"])
@@ -65,7 +67,7 @@ class BaseCRUDManager(ABC):
         self._save_or_raise(new_obj)
         return new_obj
 
-    def get_all_by_user(self, username_or_id: str) -> list[Base]:
+    def get_all_by_user(self, username_or_id: str) -> list[T]:
         if is_uuid(username_or_id):
             return self.model.get_many_by_kwargs(self.db, user_id=username_or_id)
         else:
@@ -75,16 +77,16 @@ class BaseCRUDManager(ABC):
     def get_all(self) -> list[Base]:
         return self.model.get_all(self.db)
     
-    def get(self, obj_id: str | int) -> Base:
+    def get(self, obj_id: str | int) -> T:
         if obj := self.model.get(self.db, get_uuid(obj_id) or int(obj_id)):
             return obj
         raise DatabaseError(status_code=404, exception_message="Object not found")
 
-    def update(self, obj_id: str | int, obj_data: schemas.BaseModel) -> Base:
+    def update(self, obj_id: str | int, obj_data: schemas.BaseModel) -> T:
         obj = self.get(obj_id)
         return obj.update(self.db, obj_data.model_dump())
 
-    def patch(self, obj_id: str | int, obj_data: schemas.BaseModel) -> Base:
+    def patch(self, obj_id: str | int, obj_data: schemas.BaseModel) -> T:
         obj = self.get(obj_id)
         return obj.update(self.db, obj_data.model_dump(exclude_unset=True))
     

@@ -44,7 +44,7 @@ def patch_wallet(
 ) -> Wallet:
     return Wallet.model_validate(wallet_manager.patch(wallet_id, wallet_data))
 
-@router.delete("/wallet/{wallet_id}", response_model=None)
+@router.delete("/wallet/{wallet_id}", response_model=None, status_code=204)
 def delete_wallet(
     wallet_id: str, 
     wallet_manager: WalletManager = Depends(WalletManager)

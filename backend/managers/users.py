@@ -1,23 +1,14 @@
-from typing import TYPE_CHECKING
-
-from fastapi import Depends
-
 from backend import schemas
-from backend.databases import get_db_session
 from backend.databases.models import User
 from backend.errors import UserError
 from backend.managers.base_crud import BaseCRUDManager
 from backend.validators import get_uuid
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session as DBSession
-
 
 class UserManager(BaseCRUDManager):
-    def __init__(self, db: "DBSession" = Depends(get_db_session)) -> None:
-        super().__init__(db)
 
-    def _get_db_model(self) -> type[User]:
+    @property
+    def _model_class(self) -> type[User]:
         return User
 
     def create_user(self, user: schemas.UserCreateOrUpdate) -> User:
