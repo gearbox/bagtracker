@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_mixin, relationship
 from sqlalchemy.sql import func
@@ -140,11 +140,14 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), nullable=True)
-    tx_hash = Column(String(100), index=True)
-    symbol = Column(String(20))
-    amount = Column(Float)
-    fee = Column(Float, nullable=True)
-    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
+    tx_hash = Column(String(100), nullable=True)
+    tx_type = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False)
+    amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
+    value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    fee_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     wallet = relationship("Wallet", back_populates="transactions")
 
@@ -153,11 +156,14 @@ class Transaction(Base):
             "id": self.id,
             "wallet_id": self.wallet_id,
             "tx_hash": self.tx_hash,
+            "tx_type": self.tx_type,
             "symbol": self.symbol,
             "amount": self.amount,
-            "fee": self.fee,
+            "value_usd": self.value_usd,
+            "fee_usd": self.fee_usd,
             "memo": self.memo,
             "timestamp": self.timestamp,
+            "created_at": self.created_at,
         }
 
 
@@ -170,8 +176,8 @@ class BalanceBase:
     name = Column(String(100), nullable=True)
     decimals = Column(Integer, nullable=False, default=18)
     amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
-    usd_value = Column(Numeric(precision=20, scale=4), nullable=True)
-    avg_usd_value = Column(Numeric(precision=20, scale=4), nullable=True)  # average purchase price per token
+    value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    avg_value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)  # average purchase price
     type = Column(String(20), nullable=True)  # native | erc20 | nft
 
     def to_schema(self) -> dict:
@@ -183,8 +189,8 @@ class BalanceBase:
             "name": self.name,
             "decimals": self.decimals,
             "amount": self.amount,
-            "usd_value": self.usd_value,
-            "avg_usd_value": self.avg_usd_value,
+            "value_usd": self.value_usd,
+            "avg_value_usd": self.avg_value_usd,
             "type": self.type,
         }
 
@@ -237,7 +243,7 @@ class NFTBalanceBase:
     token_id = Column(String(100), nullable=False)
     token_url = Column(Text, nullable=True)
     token_metadata = Column(JSON, nullable=True)  # store JSON metadata
-    usd_value = Column(Numeric(precision=20, scale=4), nullable=True)
+    value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
     image_url = Column(Text, nullable=True)
 
     def to_schema(self) -> dict:
@@ -249,7 +255,7 @@ class NFTBalanceBase:
             "token_id": self.token_id,
             "token_url": self.token_url,
             "token_metadata": self.token_metadata,
-            "usd_value": self.usd_value,
+            "value_usd": self.value_usd,
             "image_url": self.image_url,
         }
 
@@ -292,6 +298,7 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
 
 
 class Exchange(Base):
+    """Centralized exchanges supported, e.g. Bybit, Binance, BingX, HTX, etc."""
     __tablename__ = "exchanges"
 
     id = Column(Integer, primary_key=True)
@@ -340,8 +347,8 @@ class CexBalanceBase:
     name = Column(String(100), nullable=True)
     decimals = Column(Integer, nullable=False, default=18)
     amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
-    usd_value = Column(Numeric(precision=20, scale=4), nullable=True)
-    avg_usd_value = Column(Numeric(precision=20, scale=4), nullable=True)  # average purchase price per token
+    value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    avg_value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)  # average purchase price
 
     def to_schema(self) -> dict:
         return {
@@ -350,8 +357,8 @@ class CexBalanceBase:
             "name": self.name,
             "decimals": self.decimals,
             "amount": self.amount,
-            "usd_value": self.usd_value,
-            "avg_usd_value": self.avg_usd_value,
+            "value_usd": self.value_usd,
+            "avg_value_usd": self.avg_value_usd,
         }
 
 

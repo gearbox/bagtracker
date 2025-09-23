@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Response
 from fastapi import status as status_code
 
@@ -11,14 +13,14 @@ router = APIRouter()
 @router.post("/user", response_model=schemas.User, status_code=status_code.HTTP_201_CREATED)
 def create_user(
     user: schemas.UserCreateOrUpdate,
-    user_manager: UserManager = Depends(UserManager),
+    user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> schemas.User:
     return schemas.User.model_validate(user_manager.create_user(user).to_schema())
 
 @router.get("/user/{username}", response_model=schemas.User)
 def get_user(
     username: str, 
-    user_manager: UserManager = Depends(UserManager)
+    user_manager: Annotated[UserManager, Depends(UserManager)]
 ) -> schemas.User:
     return schemas.User.model_validate(user_manager.get_user(username).to_schema())
 
@@ -26,7 +28,7 @@ def get_user(
 def update_user(
     username: str,
     user: schemas.UserCreateOrUpdate,
-    user_manager: UserManager = Depends(UserManager)
+    user_manager: Annotated[UserManager, Depends(UserManager)]
 ) -> schemas.User:
     return schemas.User.model_validate(user_manager.update_user(username, user).to_schema())
 
@@ -34,14 +36,14 @@ def update_user(
 def patch_user(
     username: str,
     user: schemas.UserCreateOrUpdate,
-    user_manager: UserManager = Depends(UserManager)
+    user_manager: Annotated[UserManager, Depends(UserManager)]
 ) -> schemas.User:
     return schemas.User.model_validate(user_manager.patch_user(username, user).to_schema())
 
 @router.delete("/user/{username}", status_code=status_code.HTTP_204_NO_CONTENT)
 def delete_user(
     username: str, 
-    user_manager: UserManager = Depends(UserManager)
+    user_manager: Annotated[UserManager, Depends(UserManager)]
 ) -> Response:
     user_manager.delete(username)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)
@@ -57,7 +59,7 @@ def delete_user(
         response_model=schemas.UserAll
 )
 def get_all_users(
-    user_manager: UserManager = Depends(UserManager),
+    user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> schemas.UserAll:
     return schemas.UserAll.model_validate({"users": user_manager.get_all()})
 
@@ -69,7 +71,7 @@ def get_all_users(
 )
 def delete_user_by_id(
     user_id: str,
-    user_manager: UserManager = Depends(UserManager),
+    user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> Response:
     user_manager.delete(user_id)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)

@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from fastapi import status as status_code
 from loguru import logger
@@ -12,6 +14,6 @@ router = APIRouter()
     "/info",
     status_code=status_code.HTTP_200_OK,
 )
-def info(info_manager: InfoManager = Depends(InfoManager)) -> schemas.InfoResponse:
+def info(info_manager: Annotated[InfoManager, Depends(InfoManager)]) -> schemas.InfoResponse:
     logger.info("Info requested")
     return schemas.InfoResponse(info=info_manager.get_info())

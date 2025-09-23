@@ -1,8 +1,8 @@
 """init schema
 
-Revision ID: e967eda8214a
+Revision ID: 96f4753acdb3
 Revises: 
-Create Date: 2025-09-19 17:15:33.433623
+Create Date: 2025-09-23 20:50:43.131476
 
 """
 from collections.abc import Sequence
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'e967eda8214a'
+revision: str = '96f4753acdb3'
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -121,8 +121,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=100), nullable=True),
     sa.Column('decimals', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
-    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
-    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
+    sa.Column('avg_value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
     sa.Column('type', sa.String(length=20), nullable=True),
     sa.ForeignKeyConstraint(['chain_id'], ['chains.id'], ),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
@@ -142,8 +142,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=100), nullable=True),
     sa.Column('decimals', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
-    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
-    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
+    sa.Column('avg_value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
     sa.Column('type', sa.String(length=20), nullable=True),
     sa.ForeignKeyConstraint(['chain_id'], ['chains.id'], ),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
@@ -161,8 +161,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=100), nullable=True),
     sa.Column('decimals', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
-    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
-    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
+    sa.Column('avg_value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
     sa.ForeignKeyConstraint(['subaccount_id'], ['cex_subaccounts.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('subaccount_id', 'symbol', name='uq_cex_balance_subaccount_symbol')
@@ -177,8 +177,8 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=100), nullable=True),
     sa.Column('decimals', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
-    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
-    sa.Column('avg_usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
+    sa.Column('avg_value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
     sa.ForeignKeyConstraint(['subaccount_id'], ['cex_subaccounts.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('fetched_at', 'id')
     )
@@ -195,7 +195,7 @@ def upgrade() -> None:
     sa.Column('token_id', sa.String(length=100), nullable=False),
     sa.Column('token_url', sa.Text(), nullable=True),
     sa.Column('token_metadata', sa.JSON(), nullable=True),
-    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
     sa.Column('image_url', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
@@ -213,7 +213,7 @@ def upgrade() -> None:
     sa.Column('token_id', sa.String(length=100), nullable=False),
     sa.Column('token_url', sa.Text(), nullable=True),
     sa.Column('token_metadata', sa.JSON(), nullable=True),
-    sa.Column('usd_value', sa.Numeric(precision=20, scale=4), nullable=True),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
     sa.Column('image_url', sa.Text(), nullable=True),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('fetched_at', 'id')
@@ -222,17 +222,19 @@ def upgrade() -> None:
     op.create_table('transactions',
     sa.Column('wallet_id', sa.UUID(), nullable=True),
     sa.Column('tx_hash', sa.String(length=100), nullable=True),
-    sa.Column('symbol', sa.String(length=20), nullable=True),
-    sa.Column('amount', sa.Float(), nullable=True),
-    sa.Column('fee', sa.Float(), nullable=True),
-    sa.Column('timestamp', sa.DateTime(), nullable=True),
+    sa.Column('tx_type', sa.String(length=20), nullable=False),
+    sa.Column('symbol', sa.String(length=20), nullable=False),
+    sa.Column('amount', sa.Numeric(precision=78, scale=0), nullable=False),
+    sa.Column('value_usd', sa.Numeric(precision=20, scale=4), nullable=False),
+    sa.Column('fee_usd', sa.Numeric(precision=20, scale=4), nullable=False),
+    sa.Column('timestamp', sa.DateTime(), server_default=sa.text('now()'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('id', sa.UUID(), server_default=sa.text('gen_random_uuid()'), nullable=False),
     sa.Column('memo', sa.Text(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), server_default='false', nullable=False),
     sa.ForeignKeyConstraint(['wallet_id'], ['wallets.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_transactions_tx_hash'), 'transactions', ['tx_hash'], unique=False)
     # ### end Alembic commands ###
 
     # Turn balances_history and nft_balances_history into hypertables
@@ -241,10 +243,10 @@ def upgrade() -> None:
     op.execute("SELECT create_hypertable('cex_balances_history', 'fetched_at', if_not_exists => TRUE)")
 
 
+
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_transactions_tx_hash'), table_name='transactions')
     op.drop_table('transactions')
     op.drop_index(op.f('ix_nft_balances_history_fetched_at'), table_name='nft_balances_history')
     op.drop_table('nft_balances_history')

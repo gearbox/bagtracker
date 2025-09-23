@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import sqlalchemy.exc
 from fastapi import Depends
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class TransactionManager:
-    def __init__(self, db: "DBSession" = Depends(get_db_session)) -> None:
+    def __init__(self, db: Annotated["DBSession", Depends(get_db_session)]) -> None:
         self.db = db
 
     def create_transaction(self, wallet_id: str, transaction_data: schemas.TransactionCreate) -> Transaction:

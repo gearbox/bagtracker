@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import Depends, Request
 from loguru import logger
@@ -15,8 +16,8 @@ class HealthCheckManager:
     def __init__(
         self,
         request: Request,
-        db: DBSession = Depends(get_db_session),
-        redis_client: Redis = Depends(get_redis_client),
+        db: Annotated[DBSession, Depends(get_db_session)],
+        redis_client: Annotated[Redis, Depends(get_redis_client)],
     ) -> None:
         self.db = db
         self.app = request.app

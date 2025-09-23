@@ -10,6 +10,11 @@ from backend.settings import settings
 
 
 class SeederBase(ABC):
+    actions: tuple =(
+            "seed",
+            "clear", 
+            "status",
+        )
 
     def __init__(self, session: Session):
         self.session = session
@@ -33,24 +38,14 @@ class SeederBase(ABC):
         print(f"Total records in table '{table}': {count}")
 
     def process(self, table: str, action_name: str) -> None:
-        actions = self.actions()
-        if action_name in actions:
-            getattr(self, action_name)(table)
-        else:
+        if action_name not in self.actions:
             print(f"Action '{action_name}' not supported. Supported actions: {self.actions_str()}")
             exit(1)
+        getattr(self, action_name)(table)
 
-    @staticmethod
-    def actions() -> tuple:
-        return (
-            "seed",
-            "clear", 
-            "status",
-        )
-
-    @staticmethod
-    def actions_str() -> str:
-        return ", ".join(SeederBase.actions())
+    @classmethod
+    def actions_str(cls) -> str:
+        return ", ".join(cls.actions)
 
 
 def get_seeder_module(table: str):
@@ -70,7 +65,8 @@ def get_args():
 
 
 if __name__ == "__main__":
-    table, action = get_args().table, get_args().action
+    table = get_args().table
+    action = get_args().action
     module = get_seeder_module(table)
     init_database(settings.db_url, settings.db_type)
     db = get_db_instance()

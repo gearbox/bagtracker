@@ -1,6 +1,6 @@
 import contextlib
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Annotated, Generic, TypeVar
 
 import sqlalchemy.exc
 from fastapi import Depends
@@ -19,7 +19,7 @@ T = TypeVar('T', bound=Base)
 
 class BaseCRUDManager(ABC, Generic[T]):
 
-    def __init__(self, db: "DBSession" = Depends(get_db_session)) -> None:
+    def __init__(self, db: Annotated["DBSession", Depends(get_db_session)]) -> None:
         self.db = db
         self.model = self._model_class
         if not self.model:

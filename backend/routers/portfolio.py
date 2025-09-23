@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from loguru import logger
 
@@ -10,8 +12,8 @@ router = APIRouter()
 @router.get("/portfolio-demo/{user_id}", response_model=dict)
 def get_portfolio_demo(
         user_id: str, 
-        wallet_manager: WalletManager = Depends(WalletManager),
-        eth_manager: EthereumManager = Depends(EthereumManager),
+        wallet_manager: Annotated[WalletManager, Depends(WalletManager)],
+        eth_manager: Annotated[EthereumManager, Depends(EthereumManager)],
     ) -> dict:
     wallets = wallet_manager.get_all_by_user(user_id)
     portfolio = []
@@ -38,21 +40,21 @@ def get_portfolio_demo(
 def create_portfolio(
         username: str,
         portfolio: PortfolioCreateOrUpdate,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager)
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> Portfolio:
     return Portfolio.model_validate(portfolio_manager.create(portfolio, username))
 
 @router.get("/portfolios/{username}", response_model=PortfolioAll)
 def list_portfolios(
         username: str,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager)
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> PortfolioAll:
     return PortfolioAll.model_validate({"portfolios": portfolio_manager.get_all_by_user(username)})
 
 @router.get("/portfolio/{portfolio_id}", response_model=Portfolio)
 def get_portfolio(
         portfolio_id: str,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager)
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> Portfolio:
     return Portfolio.model_validate(portfolio_manager.get(portfolio_id))
 
@@ -60,7 +62,7 @@ def get_portfolio(
 def update_portfolio(
         portfolio_id: str,
         portfolio_data: PortfolioCreateOrUpdate,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager)
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> Portfolio:
     return Portfolio.model_validate(portfolio_manager.update(portfolio_id, portfolio_data))
 
@@ -68,14 +70,14 @@ def update_portfolio(
 def patch_portfolio(
         portfolio_id: str,
         portfolio_data: PortfolioPatch,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager)
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> Portfolio:
     return Portfolio.model_validate(portfolio_manager.patch(portfolio_id, portfolio_data))
 
 @router.delete("/portfolio/{portfolio_id}", response_model=None, status_code=204)
 def delete_portfolio(
         portfolio_id: str,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager)
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> None:
     portfolio_manager.delete(portfolio_id)
 
@@ -83,7 +85,7 @@ def delete_portfolio(
 def add_wallet_to_portfolio(
         portfolio_id: str, 
         wallet_id: str,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager),
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
     ):
     portfolio_manager.add_wallet_to_portfolio(portfolio_id, wallet_id)
 
@@ -91,6 +93,6 @@ def add_wallet_to_portfolio(
 def remove_wallet_from_portfolio(
         portfolio_id: str, 
         wallet_id: str,
-        portfolio_manager: PortfolioManager = Depends(PortfolioManager),
+        portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
     ):
     portfolio_manager.remove_wallet_from_portfolio(portfolio_id, wallet_id)

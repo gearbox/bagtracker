@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 
 from backend.managers import TransactionManager
@@ -10,7 +12,7 @@ router = APIRouter()
 def create_transaction(
         wallet_id: str,
         transaction_data: TransactionCreate,
-        transaction_manager: TransactionManager = Depends()
+        transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)]
 ):
     return Transaction.model_validate(
         transaction_manager.create_transaction(wallet_id, transaction_data).to_schema()
@@ -19,6 +21,6 @@ def create_transaction(
 @router.get("/transaction/{wallet_id}", response_model=list[Transaction])
 def get_transactions(
         wallet_id: str,
-        transaction_manager: TransactionManager = Depends()
+        transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)]
 ):
     return transaction_manager.get_transactions_by_wallet(wallet_id)

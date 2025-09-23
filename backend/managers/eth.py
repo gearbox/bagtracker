@@ -1,4 +1,5 @@
 import decimal
+from typing import Annotated
 
 from eth_typing import (
     Address,
@@ -243,8 +244,8 @@ ERC20_ABI = [
 
 class EthereumManager:
     def __init__(
-        self, 
-        provider: Web3 = Depends(get_provider)
+        self,
+        provider: Annotated[Web3, Depends(get_provider)]
     ) -> None:
         self.provider = provider
 

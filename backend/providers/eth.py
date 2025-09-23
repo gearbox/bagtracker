@@ -1,6 +1,6 @@
 from web3 import Web3
 
-from backend.settings import settings, Web3Providers
+from backend.settings import Web3Providers, settings
 
 
 def get_provider(provider_name: str | None = None) -> Web3:
@@ -8,7 +8,7 @@ def get_provider(provider_name: str | None = None) -> Web3:
         try:
             provider_url = Web3Providers[provider_name].value
         except KeyError:
-            raise ValueError(f"Unknown provider: {provider_name}")
+            raise ValueError(f"Unknown provider: {provider_name}") from None
     else:
         provider_url = settings.web3_provider
 
@@ -28,7 +28,7 @@ class ProvidersManager:
                 provider_url = Web3Providers[provider_name].value
 
             except KeyError:
-                raise ValueError(f"Unknown provider: {provider_name}")
+                raise ValueError(f"Unknown provider: {provider_name}") from None
         else:
             provider_url = settings.web3_provider
 

@@ -46,7 +46,12 @@ To set up a development environment, follow these steps:
     uv sync
     ```
 
-1. Activate the virtual environment: 
+    For developers it is recommended to install the `dev` dependencies as well:
+    ```shell
+    uv sync --group dev
+    ```
+
+1. Activate the virtual environment:
     ```shell
     source .venv/bin/activate
     ```

@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 
 from backend.managers import EthereumManager
@@ -8,7 +10,7 @@ router = APIRouter()
 @router.get("/eth-balance/{address}")
 def get_eth_balance(
     address: str,
-    manager: EthereumManager = Depends(EthereumManager),
+    manager: Annotated[EthereumManager, Depends(EthereumManager)],
 ):
     balance = manager.get_balance(address)
     return {
@@ -20,7 +22,7 @@ def get_eth_balance(
 @router.get("/balance/{address}")
 def get_balance(
     address: str,
-    manager: EthereumManager = Depends(EthereumManager),
+    manager: Annotated[EthereumManager, Depends(EthereumManager)],
 ):
     eth_balance = manager.get_balance(address)
     erc20_balances = manager.get_erc20_balances(address)

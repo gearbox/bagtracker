@@ -1,7 +1,10 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Response
 from fastapi import status as status_code
 
-from backend import managers, schemas
+from backend import schemas
+from backend.managers import HealthCheckManager
 
 router = APIRouter()
 
@@ -12,7 +15,7 @@ router = APIRouter()
 )
 def healthcheck(
     response: Response,
-    healthcheck_manager: managers.HealthCheckManager = Depends(managers.HealthCheckManager),
+    healthcheck_manager: Annotated[HealthCheckManager, Depends(HealthCheckManager)],
 ) -> schemas.HealthCheckResponse:
     status_api = healthcheck_manager.get_api_status()
     status_db = healthcheck_manager.get_db_status()

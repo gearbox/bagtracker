@@ -7,7 +7,7 @@ from backend.databases.base import BaseDatabase
 
 class PostgresDatabase(BaseDatabase):
     def init_db(self) -> None:
-        logger.debug(f"Initializing Postgres database...")
+        logger.debug("Initializing Postgres database...")
         try:
             self.engine = create_engine(self.db_url)
             self.SessionLocal = sessionmaker(bind=self.engine)
