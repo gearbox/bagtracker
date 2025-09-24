@@ -6,7 +6,6 @@ from backend.validators import get_uuid
 
 
 class UserManager(BaseCRUDManager):
-
     @property
     def _model_class(self) -> type[User]:
         return User
@@ -27,13 +26,13 @@ class UserManager(BaseCRUDManager):
         if user_id := get_uuid(username_or_id):
             existing_user = User.get(self.db, user_id)
         else:
-            existing_user = User.get_by_kwargs(self.db, username=username_or_id)
+            existing_user = User.get_one_by_kwargs(self.db, username=username_or_id)
         if not existing_user:
             raise UserError(status_code=404, exception_message="User not found")
         return existing_user
 
     def get_user_by_email(self, email: str) -> User:
-        user = User.get_by_kwargs(self.db, email=email)
+        user = User.get_one_by_kwargs(self.db, email=email)
         if not user:
             raise UserError(status_code=404, exception_message="User not found")
         return user
@@ -42,6 +41,6 @@ class UserManager(BaseCRUDManager):
         if not user.username:
             raise UserError(status_code=400, exception_message="Username field is required")
         return self.get_user(username_or_id).update(self.db, update_dict=user.model_dump())
-    
+
     def patch_user(self, username_or_id: str, user: schemas.UserCreateOrUpdate) -> User:
         return self.get_user(username_or_id).update(self.db, update_dict=user.model_dump(exclude_unset=True))

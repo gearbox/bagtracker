@@ -27,7 +27,6 @@ DATA = [
 
 
 class Seeder(SeederBase):
-    
     def seed(self, table: str):
         have_new_data = False
         for item in DATA:
@@ -38,7 +37,7 @@ class Seeder(SeederBase):
                         INSERT INTO {table} (id, name, display_name) 
                         VALUES (:id, :name, :display_name)
                     """),
-                    item
+                    item,
                 )
                 have_new_data = True
                 print(f"  Adding new exchange: {item['name']}")

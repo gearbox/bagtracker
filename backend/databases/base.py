@@ -21,7 +21,7 @@ class BaseDatabase(ABC):
         pass
 
     @contextmanager
-    def session(self) -> 'Iterator[Session]':
+    def session(self) -> "Iterator[Session]":
         """Provide a database session context manager."""
         if self.SessionLocal is None:
             logger.error("Database session not initialized")

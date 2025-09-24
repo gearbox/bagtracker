@@ -75,7 +75,6 @@ class Seeder(SeederBase):
         for chain in CHAINS:
             print(f"Seeding: {chain['name']} ({chain['native_symbol']})")
             existing = self.session.execute(text(f"SELECT * FROM {table} WHERE id = :id"), {"id": chain["id"]}).scalar()
-            print(f"  Existing: {existing}")
             if not existing:
                 print(f"  Adding new chain: {chain['name']}")
                 have_new_data = True
@@ -84,7 +83,7 @@ class Seeder(SeederBase):
                         INSERT INTO {table} (id, name, name_full, chain_type, chain_id, native_symbol, explorer_url)
                         VALUES (:id, :name, :name_full, :chain_type, :chain_id, :native_symbol, :explorer_url)
                     """),
-                    chain
+                    chain,
                 )
         if have_new_data:
             self.session.commit()

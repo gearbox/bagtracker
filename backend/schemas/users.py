@@ -17,7 +17,6 @@ class UserBase(BaseModel):
 
 
 class UserCreateOrUpdate(UserBase):
-    
     @field_validator("username", mode="after")
     @classmethod
     def is_not_uuid(cls, v: str):
@@ -32,13 +31,13 @@ class UserCreateOrUpdate(UserBase):
             return v.lower()
         return v
 
-    @field_validator('username', 'name', 'last_name', mode="before")
+    @field_validator("username", "name", "last_name", mode="before")
     @classmethod
     def check_alphanumeric(cls, v: str, info: ValidationInfo) -> str:
         if isinstance(v, str):
             # info.field_name is the name of the field being validated
-            is_alphanumeric = v.replace(' ', '').isalnum()
-            assert is_alphanumeric, f'{info.field_name} must be alphanumeric'
+            is_alphanumeric = v.replace(" ", "").isalnum()
+            assert is_alphanumeric, f"{info.field_name} must be alphanumeric"
         return v
 
 

@@ -10,11 +10,11 @@ from backend.settings import settings
 
 
 class SeederBase(ABC):
-    actions: tuple =(
-            "seed",
-            "clear", 
-            "status",
-        )
+    actions: tuple = (
+        "seed",
+        "clear",
+        "status",
+    )
 
     def __init__(self, session: Session):
         self.session = session
@@ -55,6 +55,7 @@ def get_seeder_module(table: str):
     except (ModuleNotFoundError, AttributeError) as e:
         print(f"Seeder for table '{table}' not found. Error: {e}")
         exit(1)
+
 
 def get_args():
     actions_supported_str = SeederBase.actions_str()

@@ -12,7 +12,7 @@ _db_instance: BaseDatabase | None = None
 def init_database(db_url: str, db_type: str, *, force_reinit: bool = False) -> BaseDatabase:
     """
     Factory + Singleton for database instance.
-    
+
     - db_url: connection string
     - db_type: "postgres", "mariadb", etc.
     - force_reinit: if True, will rebuild instance (useful for tests)
@@ -44,7 +44,7 @@ def get_db_instance() -> BaseDatabase:
 
 
 # Dependency
-def get_db_session() -> 'Iterator[Session]':
+def get_db_session() -> "Iterator[Session]":
     db = get_db_instance()
     with db.session() as session:
         yield session

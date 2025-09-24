@@ -22,11 +22,13 @@ class Portfolio(PortfolioBase):
 class PortfolioCreateOrUpdate(PortfolioBase):
     pass
 
+
 class PortfolioPatch(BaseModel):
     name: str | None = None
     memo: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class PortfolioAll(BaseModel):
     portfolios: list[Portfolio] = []

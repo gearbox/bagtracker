@@ -45,6 +45,9 @@ class BadRequestException(GeneralProcessingException):
     message = "Bad request problem has occurred"
     status_code = 400
 
+    def __init__(self, exception_message=None):
+        super().__init__(exception_message=exception_message)
+
 
 class UnexpectedException(GeneralProcessingException):
     """Unexpected exception class"""
@@ -91,7 +94,7 @@ class WalletError(GeneralProcessingException):
     """Wallet-related exception class"""
 
     message = "Wallet not found"
-    status_code = 400
+    status_code = 404
 
     def __init__(self, status_code: int | None = None, exception_message: str | None = None):
         super().__init__(status_code=status_code, exception_message=exception_message)

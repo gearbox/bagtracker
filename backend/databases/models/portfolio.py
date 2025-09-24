@@ -22,9 +22,7 @@ class User(Base):
     portfolios = relationship("Portfolio", back_populates="owner", cascade="all, delete-orphan")
     cex_accounts = relationship("CexAccount", back_populates="owner", cascade="all, delete-orphan")
 
-    __table_args__ = (
-        UniqueConstraint("email", name="users_email_key"),
-    )
+    __table_args__ = (UniqueConstraint("email", name="users_email_key"),)
 
     def to_schema(self) -> dict:
         return {
@@ -45,7 +43,7 @@ class Chain(Base):
     Blockchain networks supported, e.g. Ethereum Mainnet, BSC, Tron, Stacks, Solana, etc.
     Used to link wallets and tokens to specific chains.
     Each chain has a unique numeric chain_id (for EVM chains) or native identifier.
-    
+
     Chains table example:
 
     | id | name         | name_full           | chain_type | chain_id  | native_symbol | explorer_url                |
@@ -89,7 +87,8 @@ class Portfolio(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     owner = relationship("User", back_populates="portfolios")
-    wallets = relationship("Wallet", back_populates="portfolio")
+    wallets = relationship("Wallet", back_populates="portfolio", cascade="all, delete-orphan")
+    cex_accounts = relationship("CexAccount", back_populates="portfolio", cascade="all, delete-orphan")
 
     def to_schema(self) -> dict:
         return {
@@ -98,6 +97,7 @@ class Portfolio(Base):
             "memo": self.memo,
             "created_at": self.created_at,
             "wallets": [wallet.to_schema() for wallet in self.wallets],
+            "cex_accounts": [account.to_schema() for account in self.cex_accounts],
         }
 
 
@@ -140,16 +140,20 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), nullable=True)
+    cex_account_id = Column(UUID(as_uuid=True), ForeignKey("cex_accounts.id", ondelete="CASCADE"), nullable=True)
     tx_hash = Column(String(100), nullable=True)
     tx_type = Column(String(20), nullable=False)
+    counterparty_addr = Column(String(100), nullable=True)  # optional, e.g. counterparty address
     symbol = Column(String(20), nullable=False)
     amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
     value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
-    fee_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    fee_value = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    fee_currency = Column(String(20), nullable=False, default="USD")
     timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     wallet = relationship("Wallet", back_populates="transactions")
+    cex_account = relationship("CexAccount", back_populates="transactions")
 
     def to_schema(self) -> dict:
         return {
@@ -157,10 +161,12 @@ class Transaction(Base):
             "wallet_id": self.wallet_id,
             "tx_hash": self.tx_hash,
             "tx_type": self.tx_type,
+            "counterparty_addr": self.counterparty_addr,
             "symbol": self.symbol,
             "amount": self.amount,
             "value_usd": self.value_usd,
-            "fee_usd": self.fee_usd,
+            "fee_value": self.fee_value,
+            "fee_currency": self.fee_currency,
             "memo": self.memo,
             "timestamp": self.timestamp,
             "created_at": self.created_at,
@@ -203,9 +209,7 @@ class Balance(Base, BalanceBase):
     wallet = relationship("Wallet", back_populates="balances")
     chain = relationship("Chain", backref="balances")
 
-    __table_args__ = (
-        UniqueConstraint("wallet_id", "contract_address", "chain_id", name="uq_wallet_token_chain"),
-    )
+    __table_args__ = (UniqueConstraint("wallet_id", "contract_address", "chain_id", name="uq_wallet_token_chain"),)
 
     def to_schema(self) -> dict:
         return {
@@ -267,9 +271,7 @@ class NFTBalance(Base, NFTBalanceBase):
 
     wallet = relationship("Wallet", back_populates="nft_balances")
 
-    __table_args__ = (
-        UniqueConstraint("wallet_id", "contract_address", name="uq_nft_wallet_token"),
-    )
+    __table_args__ = (UniqueConstraint("wallet_id", "contract_address", name="uq_nft_wallet_token"),)
 
     def to_schema(self) -> dict:
         return {
@@ -299,11 +301,12 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
 
 class Exchange(Base):
     """Centralized exchanges supported, e.g. Bybit, Binance, BingX, HTX, etc."""
+
     __tablename__ = "exchanges"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False)  # e.g. "bybit"
-    display_name = Column(String(100), nullable=True)      # e.g. "Bybit"
+    display_name = Column(String(100), nullable=True)  # e.g. "Bybit"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     accounts = relationship("CexAccount", back_populates="exchange", cascade="all, delete-orphan")
@@ -314,6 +317,7 @@ class CexAccount(Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     exchange_id = Column(Integer, ForeignKey("exchanges.id"), nullable=False)
+    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=True)
 
     # For API keys, etc
     api_key = Column(String(255), nullable=True)
@@ -325,6 +329,8 @@ class CexAccount(Base):
     owner = relationship("User", back_populates="cex_accounts")
     exchange = relationship("Exchange", back_populates="accounts")
     subaccounts = relationship("CexSubAccount", back_populates="account", cascade="all, delete-orphan")
+    portfolio = relationship("Portfolio", back_populates="cex_accounts")
+    transactions = relationship("Transaction", back_populates="cex_account", cascade="all, delete-orphan")
 
 
 class CexSubAccount(Base):
@@ -371,9 +377,7 @@ class CexBalance(Base, CexBalanceBase):
 
     subaccount = relationship("CexSubAccount", back_populates="balances")
 
-    __table_args__ = (
-        UniqueConstraint("subaccount_id", "symbol", name="uq_cex_balance_subaccount_symbol"),
-    )
+    __table_args__ = (UniqueConstraint("subaccount_id", "symbol", name="uq_cex_balance_subaccount_symbol"),)
 
     def to_schema(self) -> dict:
         return {
