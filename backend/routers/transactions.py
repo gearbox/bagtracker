@@ -13,7 +13,16 @@ def create_transaction(
     transaction_data: TransactionCreateOrUpdate,
     transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)],
 ) -> Transaction:
-    return Transaction.model_validate(transaction_manager.create_transaction(transaction_data))
+    return Transaction.model_validate(transaction_manager.create_tx(transaction_data))
+
+
+@router.post("/transaction/wallet/{wallet_id}", response_model=Transaction)
+def create_wallet_transaction(
+    wallet_id: str,
+    transaction_data: TransactionCreateOrUpdate,
+    transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)],
+) -> Transaction:
+    return Transaction.model_validate(transaction_manager.create_tx_for_wallet(wallet_id, transaction_data))
 
 
 @router.get("/wallet/transactions/{wallet_id}", response_model=TransactionsAll, tags=["Wallets"])
