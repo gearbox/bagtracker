@@ -4,11 +4,12 @@ from typing import TYPE_CHECKING, Annotated, Generic, TypeVar
 
 import sqlalchemy.exc
 from fastapi import Depends
+from loguru import logger
 
 from backend import schemas
 from backend.databases import get_db_session
 from backend.databases.models import Base, User
-from backend.errors import DatabaseError, UnexpectedException
+from backend.errors import BadRequestException, DatabaseError, UnexpectedException
 from backend.validators import get_uuid, is_uuid
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ class BaseCRUDManager(ABC, Generic[T]):
         except sqlalchemy.exc.SQLAlchemyError as e:
             raise DatabaseError(status_code=500, exception_message=f"Internal database error: {str(e)}") from e
         except Exception as e:
+            logger.exception("Unexpected exception occurred during save operation")
             raise DatabaseError(status_code=500, exception_message=f"Internal server error: {str(e)}") from e
 
     def _if_user_exists(self, username_or_id: str) -> User:
@@ -46,7 +48,9 @@ class BaseCRUDManager(ABC, Generic[T]):
             return User.get_one_by_kwargs(self.db, username=username_or_id)
 
     def _error_if_exists(self, obj_id: str | int) -> None:
-        if self.model.get(self.db, get_uuid(obj_id) or int(obj_id)):
+        if not (uuid_or_int := get_uuid(obj_id) or int(obj_id)):
+            raise BadRequestException()
+        if self.model.get(self.db, uuid_or_int):
             raise DatabaseError(status_code=400, exception_message="Object already exists")
 
     def _without_none_values(self, data: dict) -> dict:
@@ -66,9 +70,8 @@ class BaseCRUDManager(ABC, Generic[T]):
     def get_all_by_user(self, username_or_id: str) -> list[T]:
         if is_uuid(username_or_id):
             return self.model.get_many_by_kwargs(self.db, user_id=username_or_id)
-        else:
-            user = User.get_one_by_kwargs(self.db, username=username_or_id)
-            return getattr(user, self.model.__tablename__)
+        user = User.get_one_by_kwargs(self.db, username=username_or_id)
+        return getattr(user, self.model.__tablename__)
 
     def get_all_by_kwargs(self, **kwargs) -> list[T]:
         return self.model.get_many_by_kwargs(self.db, **kwargs)
@@ -94,6 +97,7 @@ class BaseCRUDManager(ABC, Generic[T]):
         except sqlalchemy.exc.SQLAlchemyError as e:
             raise DatabaseError(exception_message=f"Internal database error: {str(e)}") from e
         except Exception as e:
+            logger.exception("Unexpected exception occurred during delete operation")
             raise UnexpectedException(exception_message=f"Internal server error: {str(e)}") from e
 
     def sync_sequence(self) -> None:

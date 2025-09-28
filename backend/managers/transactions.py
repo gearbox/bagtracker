@@ -6,6 +6,14 @@ from backend.validators import get_uuid
 
 
 class TransactionManager(BaseCRUDManager[Transaction]):
+    """
+    Best practice: never modify past transactions.
+    If you need corrections, insert a reversing tx + new tx.
+    All inserts must be idempotent (re-running job yields same result).
+    Wrap updates in DB transactions.
+    For corrections: recompute from earliest affected tx forward.
+    """
+
     @property
     def _model_class(self) -> type[Transaction]:
         return Transaction

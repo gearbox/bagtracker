@@ -1,4 +1,4 @@
-# Bag Tracker 
+# Bag Tracker 💰
 ### _Track Your Bags. Embrace the Rekt._
 
 

@@ -1,8 +1,22 @@
-import datetime
+import uuid
+from datetime import UTC, datetime
+from decimal import Decimal
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    event,
+)
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from sqlalchemy.sql import func
 
 from backend.databases.models import Base
@@ -11,106 +25,76 @@ from backend.databases.models import Base
 class User(Base):
     __tablename__ = "users"
 
-    username = Column(String(50), nullable=False, unique=True, index=True)
-    password = Column(Text, nullable=True)
-    email = Column(Text, nullable=True)
-    name = Column(String(50), nullable=True)
-    last_name = Column(String(50), nullable=True)
-    nickname = Column(String(50), nullable=True)
+    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    nickname: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     wallets = relationship("Wallet", back_populates="owner", cascade="all, delete-orphan")
     portfolios = relationship("Portfolio", back_populates="owner", cascade="all, delete-orphan")
     cex_accounts = relationship("CexAccount", back_populates="owner", cascade="all, delete-orphan")
 
-    __table_args__ = (UniqueConstraint("email", name="users_email_key"),)
+    __table_args__ = (
+        UniqueConstraint("email", name="users_email_key"),
+        CheckConstraint(r"email ~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'", name="check_email_format_lower"),
+    )
 
-    def to_schema(self) -> dict:
-        return {
-            "id": self.id,
-            "username": self.username,
-            "email": self.email,
-            "name": self.name,
-            "last_name": self.last_name,
-            "nickname": self.nickname,
-            "memo": self.memo,
-            "wallets": [wallet.to_schema() for wallet in self.wallets],
-            "portfolios": [portfolio.to_schema() for portfolio in self.portfolios],
-        }
-
-
-class Chain(Base):
-    """
-    Blockchain networks supported, e.g. Ethereum Mainnet, BSC, Tron, Stacks, Solana, etc.
-    Used to link wallets and tokens to specific chains.
-    Each chain has a unique numeric chain_id (for EVM chains) or native identifier.
-
-    Chains table example:
-
-    | id | name         | name_full           | chain_type | chain_id  | native_symbol | explorer_url                |
-    | -- | ------------ | ------------------- | ---------- | --------- | ------------- | --------------------------- |
-    | 1  | eth-mainnet  | Ethereum Mainnet    | evm        | 1         | ETH           | https://etherscan.io/       |
-    | 2  | bsc-mainnet  | Binance Smart Chain | evm        | 56        | BNB           | https://bscscan.com/        |
-    | 3  | tron-mainnet | Tron Mainnet        | non-evm    | 728126428 | TRX           | https://tronscan.org/       |
-    | 4  | stx-mainnet  | Stacks Mainnet      | non-evm    | 5757      | STX           | https://explorer.hiro.so    |
-    | 5  | sol-mainnet  | Solana Mainnet      | non-evm    | None      | SOL           | https://explorer.solana.com/|
-
-    """
-
-    __tablename__ = "chains"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(50), unique=True, nullable=False)  # short identifier, e.g. "eth-mainnet", "bsc-mainnet", etc
-    name_full = Column(Text, nullable=True)  # Human-readable name: "Ethereum Mainnet", "Binance Smart Chain"
-    chain_type = Column(String(50), nullable=False)  # "evm", "bitcoin", "tron", "stacks", "solana" etc.
-    chain_id = Column(Integer, nullable=True)  # EVM: numeric (as str, e.g. "1", "56", "137"), others: null or native id
-    native_symbol = Column(String(10), nullable=False)  # e.g. ETH, BNB, TRX, STX
-    explorer_url = Column(Text, nullable=True)  # optional: e.g. "https://etherscan.io/"
-
-    def to_schema(self) -> dict:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "name_full": self.name_full,
-            "chain_type": self.chain_type,
-            "chain_id": self.chain_id,
-            "native_symbol": self.native_symbol,
-            "explorer_url": self.explorer_url,
-            "memo": self.memo,
-        }
+    @validates("email")
+    def validate_email(self, key, email):
+        return email.lower().strip() if email else email
 
 
 class Portfolio(Base):
     __tablename__ = "portfolios"
 
-    name = Column(String(100), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id: Mapped["uuid.UUID"] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner = relationship("User", back_populates="portfolios")
     wallets = relationship("Wallet", back_populates="portfolio", cascade="all, delete-orphan")
     cex_accounts = relationship("CexAccount", back_populates="portfolio", cascade="all, delete-orphan")
 
     def to_schema(self) -> dict:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "memo": self.memo,
-            "created_at": self.created_at,
-            "wallets": [wallet.to_schema() for wallet in self.wallets],
-            "cex_accounts": [account.to_schema() for account in self.cex_accounts],
-        }
+        base_schema = super().to_schema()
+        if self.total_value_usd:
+            base_schema["total_value_usd_display"] = f"${self.total_value_usd:,.2f}"
+        return base_schema
 
 
 class Wallet(Base):
     __tablename__ = "wallets"
 
-    name = Column(String(100), nullable=True)  # optional user-defined name
-    type = Column(String(20), nullable=False)  # metamask, ledger, tronlink
-    address = Column(String(100), nullable=False, index=True, unique=True)
-    chain_id = Column(Integer, ForeignKey("chains.id"), nullable=False, index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    uuid: Mapped["uuid.UUID"] = mapped_column(
+        UUID(as_uuid=True), nullable=False, unique=True, server_default=func.gen_random_uuid()
+    )
+
+    user_id: Mapped["uuid.UUID"] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    chain_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("chains.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    portfolio_id: Mapped["uuid.UUID | None"] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    )
+
+    name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # optional user-defined name
+    wallet_type: Mapped[str] = mapped_column(String(20), nullable=False)  # metamask, ledger, tronlink
+    address: Mapped[str] = mapped_column(Text, nullable=False, index=True, unique=True)
+    sync_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    is_watched_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
 
     owner = relationship("User", back_populates="wallets")
     chain = relationship("Chain", backref="wallets")
@@ -121,56 +105,11 @@ class Wallet(Base):
     nft_balances = relationship("NFTBalance", back_populates="wallet", cascade="all, delete-orphan")
     nft_balances_history = relationship("NFTBalanceHistory", back_populates="wallet", cascade="all, delete-orphan")
 
-    def to_schema(self) -> dict:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "memo": self.memo,
-            "created_at": self.created_at,
-            "type": self.type,
-            "address": self.address,
-            "chain": self.chain.to_schema() if self.chain else None,
-            "balances": [balance.to_schema() for balance in self.balances],
-            "nft_balances": [nft.to_schema() for nft in self.nft_balances],
-            "transactions": [tx.to_schema() for tx in self.transactions],
-        }
-
-
-class Transaction(Base):
-    __tablename__ = "transactions"
-
-    wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="CASCADE"), nullable=True)
-    cex_account_id = Column(UUID(as_uuid=True), ForeignKey("cex_accounts.id", ondelete="CASCADE"), nullable=True)
-    tx_hash = Column(String(100), nullable=True)
-    tx_type = Column(String(20), nullable=False)
-    counterparty_addr = Column(String(100), nullable=True)  # optional, e.g. counterparty address
-    symbol = Column(String(20), nullable=False)
-    amount = Column(Numeric(78, 0), nullable=False, default=0)  # raw token balance, store as integer
-    value_usd = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
-    fee_value = Column(Numeric(precision=20, scale=4), nullable=False, default=0)
-    fee_currency = Column(String(20), nullable=False, default="USD")
-    timestamp = Column(DateTime, default=datetime.datetime.now(datetime.UTC), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    wallet = relationship("Wallet", back_populates="transactions")
-    cex_account = relationship("CexAccount", back_populates="transactions")
-
-    def to_schema(self) -> dict:
-        return {
-            "id": self.id,
-            "wallet_id": self.wallet_id,
-            "tx_hash": self.tx_hash,
-            "tx_type": self.tx_type,
-            "counterparty_addr": self.counterparty_addr,
-            "symbol": self.symbol,
-            "amount": self.amount,
-            "value_usd": self.value_usd,
-            "fee_value": self.fee_value,
-            "fee_currency": self.fee_currency,
-            "memo": self.memo,
-            "timestamp": self.timestamp,
-            "created_at": self.created_at,
-        }
+    __table_args__ = (
+        UniqueConstraint("address", "chain_id", name="uq_wallet_address_chain"),
+        Index("ix_wallets_user_chain", "user_id", "chain_id"),
+        Index("ix_wallets_portfolio", "portfolio_id"),
+    )
 
 
 class Exchange(Base):
@@ -178,10 +117,14 @@ class Exchange(Base):
 
     __tablename__ = "exchanges"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True, nullable=False)  # e.g. "bybit"
-    display_name = Column(String(100), nullable=True)  # e.g. "Bybit"
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)  # e.g. "bybit"
+    display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "Bybit"
+    website_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    api_base_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    rate_limit_per_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight_limit_per_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     accounts = relationship("CexAccount", back_populates="exchange", cascade="all, delete-orphan")
 
@@ -189,16 +132,27 @@ class Exchange(Base):
 class CexAccount(Base):
     __tablename__ = "cex_accounts"
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    exchange_id = Column(Integer, ForeignKey("exchanges.id"), nullable=False)
-    portfolio_id = Column(UUID(as_uuid=True), ForeignKey("portfolios.id"), nullable=True)
+    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    uuid: Mapped["uuid.UUID"] = mapped_column(
+        UUID(as_uuid=True), nullable=False, unique=True, server_default=func.gen_random_uuid()
+    )
 
+    user_id: Mapped["uuid.UUID"] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    exchange_id: Mapped[int] = mapped_column(Integer, ForeignKey("exchanges.id", ondelete="RESTRICT"), nullable=False)
+    portfolio_id: Mapped["uuid.UUID | None"] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    )
+
+    name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # optional user-defined name
     # For API keys, etc
-    api_key = Column(String(255), nullable=True)
-    api_secret = Column(String(255), nullable=True)
-    passphrase = Column(String(255), nullable=True)  # e.g. for HTX
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    api_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    passphrase: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. for HTX
+    sync_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
 
     owner = relationship("User", back_populates="cex_accounts")
     exchange = relationship("Exchange", back_populates="accounts")
@@ -210,11 +164,23 @@ class CexAccount(Base):
 class CexSubAccount(Base):
     __tablename__ = "cex_subaccounts"
 
-    account_id = Column(UUID(as_uuid=True), ForeignKey("cex_accounts.id"), nullable=False)
-    type = Column(String(50), nullable=False)  # e.g. "spot", "funding", "earn", "futures"
+    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    account_id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), ForeignKey("cex_accounts.id"), nullable=False)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    subaccount_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. "spot", "funding", "earn"
+    subaccount_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Exchange-specific name/ID
+    total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
 
     account = relationship("CexAccount", back_populates="subaccounts")
     balances = relationship("CexBalance", back_populates="subaccount", cascade="all, delete-orphan")
     balances_history = relationship("CexBalanceHistory", back_populates="subaccount", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "subaccount_type", "subaccount_name", name="uq_subaccount_identifier"),
+    )
+
+
+# Add event listeners for automatic timestamp updates
+@event.listens_for(User, "before_update")
+def receive_before_update(mapper, connection, target):
+    target.updated_at = datetime.now(UTC)

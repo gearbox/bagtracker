@@ -28,3 +28,24 @@ class PortfolioManager(BaseCRUDManager[Portfolio]):
             raise DatabaseError(400, "Wallet is not in the portfolio")
         portfolio.wallets.remove(wallet)
         self.db.commit()
+
+    # def get_portfolio_summary(self, user_id: str) -> dict[str, Any]:
+    #     """Get portfolio summary with proper decimal aggregation"""
+    #     from sqlalchemy import func
+
+    #     # Use database aggregation to maintain precision
+    #     result = session.query(
+    #         func.sum(Balance.value_usd).label('total_value'),
+    #         func.count(Balance.id).label('token_count'),
+    #         func.avg(Balance.value_usd).label('avg_value')
+    #     ).filter(
+    #         Balance.wallet_id.in_(
+    #             session.query(Wallet.id).filter(Wallet.user_id == user_id)
+    #         )
+    #     ).first()
+
+    #     return {
+    #         'total_value_usd': str(result.total_value or Decimal('0')),
+    #         'token_count': result.token_count or 0,
+    #         'avg_value_usd': str(result.avg_value or Decimal('0')),
+    #     }
