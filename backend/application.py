@@ -14,6 +14,7 @@ from loguru import logger
 from backend import errors, routers
 from backend.databases.factory import init_database
 from backend.logger import init_logging
+from backend.security.encryption import init_encryption
 from backend.settings import settings
 
 
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
     # startup logic
     app.state.start_time = datetime.now(UTC)
     init_logging()
+    init_encryption()
     init_database(settings.db_url, settings.db_type)
     yield
     # shutdown logic

@@ -1,8 +1,8 @@
-import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -15,17 +15,15 @@ from sqlalchemy import (
     UniqueConstraint,
     event,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
-from sqlalchemy.sql import func
 
 from backend.databases.models import Base
+from backend.security.encryption import EncryptedString
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     email: Mapped[str | None] = mapped_column(String(256), nullable=True)
@@ -51,9 +49,8 @@ class User(Base):
 class Portfolio(Base):
     __tablename__ = "portfolios"
 
-    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    user_id: Mapped["uuid.UUID"] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
@@ -63,8 +60,8 @@ class Portfolio(Base):
     wallets = relationship("Wallet", back_populates="portfolio", cascade="all, delete-orphan")
     cex_accounts = relationship("CexAccount", back_populates="portfolio", cascade="all, delete-orphan")
 
-    def to_schema(self) -> dict:
-        base_schema = super().to_schema()
+    def to_schema(self, include_id: bool = False) -> dict:
+        base_schema = super().to_schema(include_id)
         if self.total_value_usd:
             base_schema["total_value_usd_display"] = f"${self.total_value_usd:,.2f}"
         return base_schema
@@ -73,19 +70,12 @@ class Portfolio(Base):
 class Wallet(Base):
     __tablename__ = "wallets"
 
-    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    uuid: Mapped["uuid.UUID"] = mapped_column(
-        UUID(as_uuid=True), nullable=False, unique=True, server_default=func.gen_random_uuid()
-    )
-
-    user_id: Mapped["uuid.UUID"] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     chain_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("chains.id", ondelete="RESTRICT"), nullable=False, index=True
+        BigInteger, ForeignKey("chains.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    portfolio_id: Mapped["uuid.UUID | None"] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    portfolio_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
 
     name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # optional user-defined name
@@ -97,7 +87,7 @@ class Wallet(Base):
     total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
 
     owner = relationship("User", back_populates="wallets")
-    chain = relationship("Chain", backref="wallets")
+    chain = relationship("Chain", back_populates="wallets")
     portfolio = relationship("Portfolio", back_populates="wallets")
     transactions = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan")
     balances = relationship("Balance", back_populates="wallet", cascade="all, delete-orphan")
@@ -117,7 +107,6 @@ class Exchange(Base):
 
     __tablename__ = "exchanges"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)  # e.g. "bybit"
     display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "Bybit"
     website_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -132,24 +121,19 @@ class Exchange(Base):
 class CexAccount(Base):
     __tablename__ = "cex_accounts"
 
-    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    uuid: Mapped["uuid.UUID"] = mapped_column(
-        UUID(as_uuid=True), nullable=False, unique=True, server_default=func.gen_random_uuid()
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    exchange_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("exchanges.id", ondelete="RESTRICT"), nullable=False
     )
-
-    user_id: Mapped["uuid.UUID"] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    exchange_id: Mapped[int] = mapped_column(Integer, ForeignKey("exchanges.id", ondelete="RESTRICT"), nullable=False)
-    portfolio_id: Mapped["uuid.UUID | None"] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    portfolio_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
 
     name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # optional user-defined name
     # For API keys, etc
-    api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    api_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
-    passphrase: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. for HTX
+    api_key: Mapped[str | None] = mapped_column(EncryptedString(500), nullable=True)
+    api_secret: Mapped[str | None] = mapped_column(EncryptedString(500), nullable=True)
+    passphrase: Mapped[str | None] = mapped_column(EncryptedString(500), nullable=True)  # e.g. for HTX
     sync_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
@@ -160,20 +144,21 @@ class CexAccount(Base):
     portfolio = relationship("Portfolio", back_populates="cex_accounts")
     transactions = relationship("Transaction", back_populates="cex_account", cascade="all, delete-orphan")
 
+    __table_args__ = (Index("idx_cex_account_user_exchange", "user_id", "exchange_id"),)
+
 
 class CexSubAccount(Base):
     __tablename__ = "cex_subaccounts"
 
-    id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    account_id: Mapped["uuid.UUID"] = mapped_column(UUID(as_uuid=True), ForeignKey("cex_accounts.id"), nullable=False)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cex_accounts.id"), nullable=False)
 
     subaccount_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. "spot", "funding", "earn"
     subaccount_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Exchange-specific name/ID
     total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
 
     account = relationship("CexAccount", back_populates="subaccounts")
-    balances = relationship("CexBalance", back_populates="subaccount", cascade="all, delete-orphan")
-    balances_history = relationship("CexBalanceHistory", back_populates="subaccount", cascade="all, delete-orphan")
+    cex_balances = relationship("CexBalance", back_populates="subaccount", cascade="all, delete-orphan")
+    cex_balances_history = relationship("CexBalanceHistory", back_populates="subaccount", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("account_id", "subaccount_type", "subaccount_name", name="uq_subaccount_identifier"),

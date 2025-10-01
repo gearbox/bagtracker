@@ -4,6 +4,7 @@ from backend.managers.base_crud import BaseCRUDManager
 
 
 class WalletManager(BaseCRUDManager[Wallet]):
+    # TODO: Soft delete does not work, need to fix it
     @property
     def _model_class(self) -> type[Wallet]:
         return Wallet

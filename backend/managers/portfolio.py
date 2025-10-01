@@ -1,7 +1,8 @@
+import uuid
+
 from backend.databases.models import Portfolio, Wallet
 from backend.errors import DatabaseError
 from backend.managers.base_crud import BaseCRUDManager
-from backend.validators import get_uuid
 
 
 class PortfolioManager(BaseCRUDManager[Portfolio]):
@@ -9,9 +10,9 @@ class PortfolioManager(BaseCRUDManager[Portfolio]):
     def _model_class(self) -> type[Portfolio]:
         return Portfolio
 
-    def add_wallet_to_portfolio(self, portfolio_id: str, wallet_id: str) -> None:
-        portfolio = self.get(portfolio_id)
-        wallet = Wallet.get(self.db, get_uuid(wallet_id))
+    def add_wallet_to_portfolio(self, portfolio_uuid: str, wallet_uuid: str) -> None:
+        portfolio = self.get(portfolio_uuid)
+        wallet = Wallet.get_by_uuid(self.db, uuid.UUID(wallet_uuid))
         if wallet is None:
             raise DatabaseError(404, "Wallet is not found")
         if wallet in portfolio.wallets:
@@ -19,9 +20,9 @@ class PortfolioManager(BaseCRUDManager[Portfolio]):
         portfolio.wallets.append(wallet)
         self.db.commit()
 
-    def remove_wallet_from_portfolio(self, portfolio_id: str, wallet_id: str) -> None:
-        portfolio = self.get(portfolio_id)
-        wallet = Wallet.get(self.db, get_uuid(wallet_id))
+    def remove_wallet_from_portfolio(self, portfolio_uuid: str, wallet_uuid: str) -> None:
+        portfolio = self.get(portfolio_uuid)
+        wallet = Wallet.get_by_uuid(self.db, uuid.UUID(wallet_uuid))
         if wallet is None:
             raise DatabaseError(404, "Wallet is not found")
         if wallet not in portfolio.wallets:

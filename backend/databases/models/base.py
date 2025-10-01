@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Self, TypeVar
 
-from sqlalchemy import Boolean, DateTime, Text
+from loguru import logger
+from sqlalchemy import BigInteger, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -38,31 +39,52 @@ class DecimalEncoder(json.JSONEncoder):
 
 
 class Base(DeclarativeBase):
+    """
+    Base model with dual ID strategy:
+    - id (BigInteger): Internal use, database joins, foreign keys
+    - uuid (UUID): External use, API exposure, frontend
+    """
+
     __abstract__ = True
 
+    # Primary key - BigInteger for performance
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, comment="Internal primary key for database operations"
+    )
+
+    # UUID for API/external use
+    uuid: Mapped["uuid.UUID"] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        server_default=func.gen_random_uuid(),
+        index=True,
+        comment="External identifier for API and frontend",
+    )  # For API lookups
+
+    # Common fields
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)  # optional user-defined memo/description
-    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     # Audit fields
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    created_by: Mapped["uuid.UUID | None"] = mapped_column(
-        UUID(as_uuid=True), nullable=True
-    )  # Track who created the record
-    updated_by: Mapped["uuid.UUID | None"] = mapped_column(UUID(as_uuid=True), nullable=True)  # Track who last updated
+    created_by: Mapped[int | None] = mapped_column(UUID(as_uuid=True), nullable=True)  # Who created the record
+    updated_by: Mapped[int | None] = mapped_column(UUID(as_uuid=True), nullable=True)  # Who last updated
 
     def save(self, session: Session, commit: bool = True) -> None:
         session.add(self)
         if commit:
             session.commit()
 
-    def delete(self, session: Session, user_id: uuid.UUID | None = None) -> None:
+    def delete(self, session: Session, by_user_id: int | None = None) -> None:
         """Soft delete instead of hard delete"""
         self.is_deleted = True
-        if user_id:
-            self.updated_by = user_id
+        if by_user_id:
+            self.updated_by = by_user_id
         self.updated_at = datetime.now(UTC)
         self.save(session)
 
@@ -72,12 +94,24 @@ class Base(DeclarativeBase):
         session.commit()
 
     @classmethod
-    def get(cls: type[T], session: Session, item_id: uuid.UUID | int, include_deleted: bool = False) -> T:
+    def get_by_id(cls: type[T], session: Session, item_id: int, include_deleted: bool = False) -> T:
+        """Get by internal BigInteger ID"""
         try:
             obj = session.get_one(cls, item_id)
             if obj.is_deleted and not include_deleted:
                 raise DatabaseError(404, "Object not found")
             return obj
+        except NoResultFound:
+            raise DatabaseError(404, "Object not found") from None
+
+    @classmethod
+    def get_by_uuid(cls: type[T], session: Session, item_uuid: "uuid.UUID", include_deleted: bool = False) -> T:
+        """Get by UUID (for API use)"""
+        query = session.query(cls).filter(cls.uuid == item_uuid)
+        if not include_deleted:
+            query = query.filter(cls.is_deleted == False)  # noqa: E712
+        try:
+            return query.one()
         except NoResultFound:
             raise DatabaseError(404, "Object not found") from None
 
@@ -105,29 +139,53 @@ class Base(DeclarativeBase):
             query = query.filter(cls.is_deleted == False)  # noqa: E712
         return query.all()
 
+    # TODO: Do we really need this method?
     @classmethod
-    def create(cls: type[T], session: Session, create_dict: dict, user_id: uuid.UUID | None = None) -> T:
-        if user_id:
-            create_dict["created_by"] = user_id
+    def create_for_cls(cls: type[T], session: Session, create_dict: dict, by_user_id: int | None = None) -> T:
+        if by_user_id:
+            create_dict["created_by"] = by_user_id
         instance = cls(**create_dict)
         session.add(instance)
         session.commit()
+        session.refresh(instance)
         return instance
 
-    def update(
-        self, session: Session, update_dict: dict, user_id: uuid.UUID | None = None, commit: bool = True
-    ) -> Self:
-        for attribute, value in update_dict.items():
+    def _assign_attributes(self, assign_dict: dict) -> None:
+        for attribute, value in assign_dict.items():
             if hasattr(self, attribute):
                 setattr(self, attribute, value)
-        if user_id:
-            self.updated_by = user_id
+
+    def create(self, session: Session, create_dict: dict, by_user_id: int | None = None, commit: bool = True) -> Self:
+        self._assign_attributes(create_dict)
+        if by_user_id:
+            self.created_by = by_user_id
+        self.save(session, commit)
+        if commit:
+            session.refresh(self)
+        return self
+
+    def update(self, session: Session, update_dict: dict, by_user_id: int | None = None, commit: bool = True) -> Self:
+        self._assign_attributes(update_dict)
+        if by_user_id:
+            self.updated_by = by_user_id
         self.updated_at = datetime.now(UTC)
         self.save(session, commit)
         return self
 
+    def upsert(self, session: Session, upsert_dict: dict, by_user_id: int | None = None, commit: bool = True) -> Self:
+        """
+        Update existing record or create new one if it doesn't exist.
+        If the instance has an ID, it updates; otherwise, it creates.
+        """
+        if self.id or self.uuid:
+            logger.info("Updating record")
+            return self.update(session, upsert_dict, by_user_id, commit)
+        logger.info("Creating record")
+        self.create(session, upsert_dict, by_user_id, commit)
+        return self
+
     @classmethod
-    def sync_sequence(cls, session: Session, id_column: str = "id") -> None:
+    def sync_sequence(cls, session: Session, pk_field: str = "id") -> None:
         """
         Synchronize the db sequence for the given table's id column.
 
@@ -139,14 +197,12 @@ class Base(DeclarativeBase):
 
         # Step 1: Get the sequence name
         sequence_name_query = text("SELECT pg_get_serial_sequence(:table_name, :id_column)")
-        sequence_name = session.execute(
-            sequence_name_query, {"table_name": table_name, "id_column": id_column}
-        ).scalar()
+        sequence_name = session.execute(sequence_name_query, {"table_name": table_name, "id_column": pk_field}).scalar()
         if not sequence_name:
-            raise ValueError(f"No sequence found for {table_name}.{id_column}")
+            raise ValueError(f"No sequence found for {table_name}.{pk_field}")
 
         # Step 2: Get the maximum ID
-        max_id_query = select(func.max(getattr(cls, id_column)))
+        max_id_query = select(func.max(getattr(cls, pk_field)))
         max_id = session.execute(max_id_query).scalar() or 0  # Default to 0 if table is empty
 
         # Step 3: Set the sequence to MAX(id) + 1
@@ -174,13 +230,18 @@ class Base(DeclarativeBase):
         else:
             return value
 
-    def to_dict(self, preserve_precision: bool = True) -> dict[str, Any]:
+    def to_dict(self, preserve_precision: bool = True, include_id: bool = False) -> dict[str, Any]:
         """
-        Convert to dict - preserves precision for financial data
+        Convert to dict - by default excludes internal 'id' field
+
+        Args:
+            preserve_precision: Keep Decimals as strings
+            include_id: Include internal BigInteger ID (False by default for API safety)
         """
         return {
             column.name: self._serialize_value(getattr(self, column.name), preserve_precision)
             for column in self.__table__.columns
+            if column.name != "id" and not include_id
         }
 
     def to_json(self, **kwargs) -> str:
@@ -188,9 +249,9 @@ class Base(DeclarativeBase):
         return json.dumps(self.to_dict(), ensure_ascii=False, **kwargs)
 
     # For backward compatibility, keep the existing method name but improve it
-    def to_schema(self) -> dict[str, Any]:
+    def to_schema(self, include_id: bool = False) -> dict[str, Any]:
         """Alias for to_dict() for backward compatibility"""
-        return self.to_dict()
+        return self.to_dict(include_id=include_id)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__})>"
+        return f"<{self.__class__.__name__}(id={self.id}, uuid={self.uuid})>"

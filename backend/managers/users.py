@@ -15,8 +15,7 @@ class UserManager(BaseCRUDManager):
         if not user.username:
             raise UserError(status_code=400, exception_message="Username field is required")
         new_user = User(**user.model_dump())
-        existing_user = self.db.query(User).filter(User.username == new_user.username).first()
-        if existing_user:
+        if self.db.query(User).filter(User.username == new_user.username).first():
             raise UserError(status_code=400, exception_message="This username is already taken")
         self._save_or_raise(new_user)
         return new_user
@@ -24,7 +23,7 @@ class UserManager(BaseCRUDManager):
     def get_user(self, username_or_id: str) -> User:
         existing_user = None
         if user_id := get_uuid(username_or_id):
-            existing_user = User.get(self.db, user_id)
+            existing_user = self.model.get(self.db, user_id)
         else:
             existing_user = User.get_one_by_kwargs(self.db, username=username_or_id)
         if not existing_user:
@@ -32,10 +31,9 @@ class UserManager(BaseCRUDManager):
         return existing_user
 
     def get_user_by_email(self, email: str) -> User:
-        user = User.get_one_by_kwargs(self.db, email=email)
-        if not user:
-            raise UserError(status_code=404, exception_message="User not found")
-        return user
+        if user := User.get_one_by_kwargs(self.db, email=email):
+            return user
+        raise UserError(status_code=404, exception_message="User not found")
 
     def update_user(self, username_or_id: str, user: schemas.UserCreateOrUpdate) -> User:
         if not user.username:

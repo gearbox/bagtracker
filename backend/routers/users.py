@@ -39,7 +39,8 @@ def patch_user(
 
 @router.delete("/user/{username}", status_code=status_code.HTTP_204_NO_CONTENT)
 def delete_user(username: str, user_manager: Annotated[UserManager, Depends(UserManager)]) -> Response:
-    user_manager.delete(username)
+    user = user_manager.get_user(username)
+    user_manager.delete(user.id)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)
 
 
@@ -55,14 +56,14 @@ def get_all_users(
 
 
 @router.delete(
-    "/user-management/user/{user_id}",
+    "/user-management/user/{user_uuid}",
     tags=["User Management"],
     dependencies=token_auth,
     status_code=status_code.HTTP_204_NO_CONTENT,
 )
 def delete_user_by_id(
-    user_id: str,
+    user_uuid: str,
     user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> Response:
-    user_manager.delete(user_id)
+    user_manager.delete(user_uuid)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)

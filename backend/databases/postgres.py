@@ -14,10 +14,10 @@ class PostgresDatabase(BaseDatabase):
             self.engine = create_engine(
                 self.db_url,
                 poolclass=QueuePool,
-                pool_size=20,
-                max_overflow=30,
-                pool_pre_ping=True,
-                pool_recycle=3600,  # 1 hour
+                pool_size=10,
+                max_overflow=20,
+                pool_pre_ping=True,  # Verify connections before use
+                pool_recycle=3600,  # Recycle connections after 1 hour
                 echo=False,
                 connect_args={
                     "connect_timeout": 10,
@@ -25,7 +25,7 @@ class PostgresDatabase(BaseDatabase):
                 },
             )
             self.SessionLocal = sessionmaker(bind=self.engine)
-            logger.info("Postgres database initialized successfully")
+            logger.info("✅ Postgres database initialized successfully")
         except Exception as e:
             logger.error(f"Postgres initialization failed: {e}")
             self.engine, self.SessionLocal = None, None

@@ -29,7 +29,7 @@ class TransactionManager(BaseCRUDManager[Transaction]):
     def create_tx_for_wallet(self, wallet_id: str, transaction_data: schemas.TransactionCreateOrUpdate) -> Transaction:
         transaction = transaction_data.model_dump(exclude_unset=True)
         if wallet_uuid := get_uuid(wallet_id):
-            wallet = Wallet.get(self.db, wallet_uuid)
+            wallet = Wallet.get_by_uuid(self.db, wallet_uuid)
             new_obj = self.model(**transaction, **{"wallet_id": wallet.id})
             self._save_or_raise(new_obj)
             return new_obj

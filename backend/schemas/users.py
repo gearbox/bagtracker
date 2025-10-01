@@ -27,9 +27,7 @@ class UserCreateOrUpdate(UserBase):
     @field_validator("email", mode="before")
     @classmethod
     def convert_to_lower(cls, v: str):
-        if isinstance(v, str):
-            return v.lower()
-        return v
+        return v.lower() if isinstance(v, str) else v
 
     @field_validator("username", "name", "last_name", mode="before")
     @classmethod
@@ -46,7 +44,7 @@ class UserPatch(UserCreateOrUpdate):
 
 
 class User(UserBase):
-    id: UUID
+    uuid: UUID
     wallets: list[Wallet] = []
     portfolios: list = []
     cex_accounts: list = []
