@@ -24,9 +24,9 @@ def init_database(db_url: str, db_type: str, *, force_reinit: bool = False) -> B
 
     db_type = db_type.lower()
 
-    if db_type in ("postgres", "postgresql"):
+    if db_type in {"postgres", "postgresql"}:
         _db_instance = PostgresDatabase(db_url)
-    elif db_type in ("maria", "mariadb"):
+    elif db_type in {"maria", "mariadb"}:
         _db_instance = MariaDatabase(db_url)
     else:
         raise ValueError(f"Unsupported database type: {db_type}")

@@ -10,6 +10,14 @@ from backend.managers import UserManager
 router = APIRouter()
 
 
+@router.post("/sign-up", response_model=schemas.User, status_code=status_code.HTTP_201_CREATED)
+def sign_up_user(
+    user: schemas.UserSignUp,
+    user_manager: Annotated[UserManager, Depends(UserManager)],
+) -> schemas.User:
+    return schemas.User.model_validate(user_manager.sign_up(user))
+
+
 @router.post("/user", response_model=schemas.User, status_code=status_code.HTTP_201_CREATED)
 def create_user(
     user: schemas.UserCreateOrUpdate,
@@ -39,7 +47,8 @@ def patch_user(
 
 @router.delete("/user/{username}", status_code=status_code.HTTP_204_NO_CONTENT)
 def delete_user(username: str, user_manager: Annotated[UserManager, Depends(UserManager)]) -> Response:
-    user_manager.delete(username)
+    user = user_manager.get_user(username)
+    user_manager.delete(user.id)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)
 
 
@@ -47,22 +56,24 @@ def delete_user(username: str, user_manager: Annotated[UserManager, Depends(User
 #################
 
 
-@router.get("/user-management/users", tags=["User Management"], dependencies=token_auth, response_model=schemas.UserAll)
+@router.get(
+    "/user-management/users", tags=["User Management"], dependencies=token_auth, response_model=schemas.UserMgmtAll
+)
 def get_all_users(
     user_manager: Annotated[UserManager, Depends(UserManager)],
-) -> schemas.UserAll:
-    return schemas.UserAll.model_validate({"users": user_manager.get_all()})
+) -> schemas.UserMgmtAll:
+    return schemas.UserMgmtAll.model_validate({"users": user_manager.get_all(include_deleted=True)})
 
 
 @router.delete(
-    "/user-management/user/{user_id}",
+    "/user-management/user/{user_uuid}",
     tags=["User Management"],
     dependencies=token_auth,
     status_code=status_code.HTTP_204_NO_CONTENT,
 )
 def delete_user_by_id(
-    user_id: str,
+    user_uuid: str,
     user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> Response:
-    user_manager.delete(user_id)
+    user_manager.delete(user_uuid)
     return Response(status_code=status_code.HTTP_204_NO_CONTENT)

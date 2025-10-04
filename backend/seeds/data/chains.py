@@ -9,7 +9,6 @@ CHAINS = [
         "name_full": "Ethereum",
         "chain_type": "evm",
         "chain_id": 1,
-        "native_symbol": "ETH",
         "explorer_url": "https://etherscan.io",
     },
     {
@@ -18,7 +17,6 @@ CHAINS = [
         "name_full": "Polygon",
         "chain_type": "evm",
         "chain_id": 137,
-        "native_symbol": "MATIC",
         "explorer_url": "https://polygonscan.com",
     },
     {
@@ -27,7 +25,6 @@ CHAINS = [
         "name_full": "BNB Smart Chain",
         "chain_type": "evm",
         "chain_id": 56,
-        "native_symbol": "BNB",
         "explorer_url": "https://bscscan.com",
     },
     {
@@ -36,7 +33,6 @@ CHAINS = [
         "name_full": "Tron",
         "chain_type": "non-evm",
         "chain_id": 728126428,
-        "native_symbol": "TRX",
         "explorer_url": "https://tronscan.org",
     },
     {
@@ -45,7 +41,6 @@ CHAINS = [
         "name_full": "Stacks",
         "chain_type": "non-evm",
         "chain_id": 5757,
-        "native_symbol": "STX",
         "explorer_url": "https://explorer.hiro.so",
     },
     {
@@ -54,7 +49,6 @@ CHAINS = [
         "name_full": "Solana",
         "chain_type": "non-evm",
         "chain_id": 101,
-        "native_symbol": "SOL",
         "explorer_url": "https://solscan.io",
     },
     {
@@ -63,7 +57,6 @@ CHAINS = [
         "name_full": "Bitcoin",
         "chain_type": "non-evm",
         "chain_id": 0,
-        "native_symbol": "BTC",
         "explorer_url": "https://mempool.space",
     },
 ]
@@ -73,15 +66,15 @@ class Seeder(SeederBase):
     def seed(self, table: str):
         have_new_data = False
         for chain in CHAINS:
-            print(f"Seeding: {chain['name']} ({chain['native_symbol']})")
+            print(f"Seeding: {chain['name']}")
             existing = self.session.execute(text(f"SELECT * FROM {table} WHERE id = :id"), {"id": chain["id"]}).scalar()
             if not existing:
                 print(f"  Adding new chain: {chain['name']}")
                 have_new_data = True
                 self.session.execute(
                     text(f"""
-                        INSERT INTO {table} (id, name, name_full, chain_type, chain_id, native_symbol, explorer_url)
-                        VALUES (:id, :name, :name_full, :chain_type, :chain_id, :native_symbol, :explorer_url)
+                        INSERT INTO {table} (id, name, name_full, chain_type, chain_id, explorer_url)
+                        VALUES (:id, :name, :name_full, :chain_type, :chain_id, :explorer_url)
                     """),
                     chain,
                 )

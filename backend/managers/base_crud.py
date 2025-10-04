@@ -1,15 +1,16 @@
 import contextlib
+import uuid
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Annotated, Generic, TypeVar
 
-import sqlalchemy.exc
 from fastapi import Depends
+from loguru import logger
 
 from backend import schemas
 from backend.databases import get_db_session
 from backend.databases.models import Base, User
-from backend.errors import DatabaseError, UnexpectedException
-from backend.validators import get_uuid, is_uuid
+from backend.errors import BadRequestException, DatabaseError
+from backend.validators import get_uuid, get_uuid_or_rise
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session as DBSession
@@ -29,72 +30,85 @@ class BaseCRUDManager(ABC, Generic[T]):
     def _model_class(self) -> type[T]:
         pass
 
-    def _save_or_raise(self, obj: Base) -> None:
-        try:
-            obj.save(self.db)
-        except sqlalchemy.exc.IntegrityError as e:
-            raise DatabaseError(status_code=500, exception_message=f"Database integrity error: {str(e)}") from e
-        except sqlalchemy.exc.SQLAlchemyError as e:
-            raise DatabaseError(status_code=500, exception_message=f"Internal database error: {str(e)}") from e
-        except Exception as e:
-            raise DatabaseError(status_code=500, exception_message=f"Internal server error: {str(e)}") from e
-
-    def _if_user_exists(self, username_or_id: str) -> User:
-        if user_id := get_uuid(username_or_id):
-            return User.get(self.db, user_id)
-        else:
-            return User.get_one_by_kwargs(self.db, username=username_or_id)
-
     def _error_if_exists(self, obj_id: str | int) -> None:
-        if self.model.get(self.db, get_uuid(obj_id) or int(obj_id)):
-            raise DatabaseError(status_code=400, exception_message="Object already exists")
+        """
+        Rises DatabaseError if object exists or BadRequestException if obj_id is not int or UUID
 
-    def _without_none_values(self, data: dict) -> dict:
-        return {k: v for k, v in data.items() if v is not None}
+        Return: None if object does not exists
+        """
+        try:
+            if isinstance(obj_id, int):
+                self.model.get_by_id(self.db, obj_id)
+            elif obj_uuid := get_uuid(obj_id):
+                self.model.get_by_uuid(self.db, obj_uuid)
+            else:
+                raise BadRequestException()
+            raise DatabaseError(status_code=400, exception_message="Object already exists")
+        except DatabaseError as e:
+            if e.status_code == 404:
+                return
+            raise
+
+    def get_user_by_name_or_uuid(self, username_or_uuid: str, include_deleted: bool = False) -> User:
+        try:
+            return User.get_by_uuid(self.db, get_uuid_or_rise(username_or_uuid), include_deleted)
+        except ValueError:
+            return User.get_one(self.db, include_deleted, username=username_or_uuid)
+
+    def get_all_by_user(self, username_or_uuid: str, include_deleted: bool = False) -> list[T]:
+        if user_uuid := get_uuid(username_or_uuid):
+            user = User.get_by_uuid(self.db, user_uuid, include_deleted)
+            return self.model.get_all(self.db, include_deleted, user_id=user.id)
+        user = User.get_one(self.db, include_deleted, username=username_or_uuid)
+        logger.info("Get all by user, getattr method")
+        return getattr(user, self.model.__tablename__)
+
+    def get_all(self, include_deleted: bool = False, **kwargs) -> list[T]:
+        return self.model.get_all(self.db, include_deleted, **kwargs)
+
+    def get(self, obj_id: int | uuid.UUID | str, include_deleted: bool = False) -> T:
+        try:
+            if isinstance(obj_id, int):
+                return self.model.get_by_id(self.db, obj_id, include_deleted)
+            return self.model.get_by_uuid(self.db, get_uuid_or_rise(obj_id), include_deleted)
+        except ValueError as e:
+            raise BadRequestException() from e
 
     def create(self, obj_data: schemas.BaseModel, for_username_or_id: str | None = None) -> T:
         create_dict = obj_data.model_dump(exclude_unset=True)
         with contextlib.suppress(KeyError):
-            self._error_if_exists(create_dict["id"])
-        user_dict = {}
+            self._error_if_exists(create_dict["uuid"])
+        user_id = None
         if for_username_or_id:
-            user_dict = {"user_id": self._if_user_exists(for_username_or_id).id}
-        new_obj = self.model(**create_dict, **user_dict)
-        self._save_or_raise(new_obj)
-        return new_obj
+            user_id = self.get_user_by_name_or_uuid(for_username_or_id).id
+            create_dict["user_id"] = user_id
+        new_obj = self.model()
+        return new_obj.create(self.db, create_dict, user_id)
 
-    def get_all_by_user(self, username_or_id: str) -> list[T]:
-        if is_uuid(username_or_id):
-            return self.model.get_many_by_kwargs(self.db, user_id=username_or_id)
-        else:
-            user = User.get_one_by_kwargs(self.db, username=username_or_id)
-            return getattr(user, self.model.__tablename__)
-
-    def get_all_by_kwargs(self, **kwargs) -> list[T]:
-        return self.model.get_many_by_kwargs(self.db, **kwargs)
-
-    def get_all(self) -> list[T]:
-        return self.model.get_all(self.db)
-
-    def get(self, obj_id: str | int) -> T:
-        return self.model.get(self.db, get_uuid(obj_id) or int(obj_id))
-
-    def update(self, obj_id: str | int, obj_data: schemas.BaseModel) -> T:
+    def update(self, obj_id: int | uuid.UUID | str, obj_data: schemas.BaseModel) -> T:
         obj = self.get(obj_id)
         return obj.update(self.db, obj_data.model_dump())
 
-    def patch(self, obj_id: str | int, obj_data: schemas.BaseModel) -> T:
+    def upsert(self, obj_data: schemas.BaseModel, for_username_or_id: str | None = None) -> T:
+        upsert_dict = obj_data.model_dump(exclude_unset=True)
+        user_id = None
+        if for_username_or_id:
+            user_id = self.get_user_by_name_or_uuid(for_username_or_id).id
+            upsert_dict["user_id"] = user_id
+        obj = None
+        with contextlib.suppress(KeyError, DatabaseError):
+            if "uuid" in upsert_dict:
+                obj = self.model.get_by_uuid(self.db, upsert_dict["uuid"])
+        if not obj:
+            obj = self.model()
+        return obj.upsert(self.db, upsert_dict, user_id)
+
+    def patch(self, obj_id: int | uuid.UUID | str, obj_data: schemas.BaseModel) -> T:
         obj = self.get(obj_id)
         return obj.update(self.db, obj_data.model_dump(exclude_unset=True))
 
-    def delete(self, obj_id: str) -> None:
-        obj = self.get(obj_id)
-        try:
-            obj.delete(self.db)
-        except sqlalchemy.exc.SQLAlchemyError as e:
-            raise DatabaseError(exception_message=f"Internal database error: {str(e)}") from e
-        except Exception as e:
-            raise UnexpectedException(exception_message=f"Internal server error: {str(e)}") from e
+    def delete(self, obj_uuid: int | uuid.UUID | str) -> None:
+        self.get(obj_uuid).delete(self.db)
 
     def sync_sequence(self) -> None:
         """

@@ -62,6 +62,20 @@ class Settings(BaseSettings):
     web3_provider: str = Web3Providers.LLAMARPC_ETH
     infura_api_key: str | None = None
 
+    # Security settings START
+    # Encryption
+    encryption_key: str = "my encryption key, set in env"
+    encryption_key_old: str | None = None  # for key rotation
+
+    # security
+    secret_key: str = "my secret key, set in env"
+    algorithm: str = "hs256"
+    access_token_expire_minutes: int = 30
+
+    # api keys rotation reminder (days)
+    api_key_rotation_days: int = 90
+    # Security settings END
+
     # Override settings with OS ENV values
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -15,7 +15,7 @@ class WalletType(Enum):
 
 class WalletBase(BaseModel):
     name: str | None = None
-    type: WalletType = WalletType.METAMASK
+    wallet_type: WalletType = WalletType.METAMASK
     address: str
     memo: str | None = None
 
@@ -28,7 +28,7 @@ class WalletCreateOrUpdate(WalletBase):
 
 class WalletPatch(BaseModel):
     name: str | None = None
-    type: WalletType | None = None
+    wallet_type: WalletType | None = None
     address: str | None = None
     memo: str | None = None
     chain_id: int | None = None
@@ -37,7 +37,7 @@ class WalletPatch(BaseModel):
 
 
 class Wallet(WalletBase):
-    id: UUID
+    uuid: UUID
     created_at: datetime
     transactions: list[Transaction] = []
     chain: Chain | None = None

@@ -13,7 +13,6 @@ class BaseChain(BaseModel):
     name_full: str | None = None
     chain_type: ChainType
     chain_id: int | None = None
-    native_symbol: str
     explorer_url: str | None = None
 
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
@@ -33,7 +32,6 @@ class ChainPatch(BaseModel):
     name_full: str | None = None
     chain_type: ChainType | None = None
     chain_id: int | None = None
-    native_symbol: str | None = None
     explorer_url: str | None = None
 
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)

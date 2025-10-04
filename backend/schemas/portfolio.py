@@ -14,7 +14,7 @@ class PortfolioBase(BaseModel):
 
 
 class Portfolio(PortfolioBase):
-    id: UUID
+    uuid: UUID
     created_at: datetime
     wallets: list[Wallet] = []
 
