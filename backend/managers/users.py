@@ -14,17 +14,14 @@ class UserManager(BaseCRUDManager):
     def sign_up(self, user_data: schemas.UserSignUp) -> User:
         """Register a new user with hashed password"""
         # Check if username already exists
-        if self.db.query(User).filter(User.username == user_data.username).first():
+        if User.query_active(self.db).filter(User.username == user_data.username).first():
             raise UserError(status_code=400, exception_message="This username is already taken")
-
         # Check if email already exists
-        if user_data.email and self.db.query(User).filter(User.email == user_data.email).first():
+        if User.query_active(self.db).filter(User.email == user_data.email).first():
             raise UserError(status_code=400, exception_message="This email is already registered")
-
         # Create user with hashed password
         user_dict = user_data.model_dump(exclude={"password"})
         user_dict["password_hash"] = hash_password(user_data.password)
-
         new_user = User(**user_dict)
         new_user.save(self.db)
         return new_user
