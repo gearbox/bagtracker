@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from backend import errors, routers
-from backend.databases.factory import init_database
+from backend.databases.factory_async import close_async_database, init_database
 from backend.logger import init_logging
 from backend.security.encryption import init_encryption
 from backend.settings import settings
@@ -29,9 +29,10 @@ async def lifespan(app: FastAPI):
     app.state.start_time = datetime.now(UTC)
     init_logging()
     init_encryption()
-    init_database(settings.db_url, settings.db_type)
+    await init_database(settings.async_db_url, settings.db_type)
     yield
     # shutdown logic
+    await close_async_database()
 
 
 def create_app() -> FastAPI:

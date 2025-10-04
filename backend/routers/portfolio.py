@@ -10,12 +10,12 @@ router = APIRouter()
 
 
 @router.get("/portfolio-demo/{user_id}", response_model=dict)
-def get_portfolio_demo(
+async def get_portfolio_demo(
     user_id: str,
     wallet_manager: Annotated[WalletManager, Depends(WalletManager)],
     eth_manager: Annotated[EthereumManager, Depends(EthereumManager)],
 ) -> dict:
-    wallets = wallet_manager.get_all_by_user(user_id)
+    wallets = await wallet_manager.get_all_by_user(user_id)
     portfolio = []
     for wallet in wallets:
         chain = wallet.chain
@@ -43,66 +43,66 @@ def get_portfolio_demo(
 
 
 @router.post("/portfolio/{username}", response_model=Portfolio)
-def create_portfolio(
+async def create_portfolio(
     username: str,
     portfolio: PortfolioCreateOrUpdate,
     portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
 ) -> Portfolio:
-    return Portfolio.model_validate(portfolio_manager.create(portfolio, username))
+    return Portfolio.model_validate(await portfolio_manager.create(portfolio, username))
 
 
 @router.get("/portfolios/{username}", response_model=PortfolioAll)
-def list_portfolios(
+async def list_portfolios(
     username: str, portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> PortfolioAll:
-    return PortfolioAll.model_validate({"portfolios": portfolio_manager.get_all_by_user(username)})
+    return PortfolioAll.model_validate({"portfolios": await portfolio_manager.get_all_by_user(username)})
 
 
 @router.get("/portfolio/{portfolio_id}", response_model=Portfolio)
-def get_portfolio(
+async def get_portfolio(
     portfolio_id: str, portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> Portfolio:
-    return Portfolio.model_validate(portfolio_manager.get(portfolio_id))
+    return Portfolio.model_validate(await portfolio_manager.get(portfolio_id))
 
 
 @router.put("/portfolio/{portfolio_id}", response_model=Portfolio)
-def update_portfolio(
+async def update_portfolio(
     portfolio_id: str,
     portfolio_data: PortfolioCreateOrUpdate,
     portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
 ) -> Portfolio:
-    return Portfolio.model_validate(portfolio_manager.update(portfolio_id, portfolio_data))
+    return Portfolio.model_validate(await portfolio_manager.update(portfolio_id, portfolio_data))
 
 
 @router.patch("/portfolio/{portfolio_id}", response_model=Portfolio)
-def patch_portfolio(
+async def patch_portfolio(
     portfolio_id: str,
     portfolio_data: PortfolioPatch,
     portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
 ) -> Portfolio:
-    return Portfolio.model_validate(portfolio_manager.patch(portfolio_id, portfolio_data))
+    return Portfolio.model_validate(await portfolio_manager.patch(portfolio_id, portfolio_data))
 
 
 @router.delete("/portfolio/{portfolio_id}", response_model=None, status_code=204)
-def delete_portfolio(
+async def delete_portfolio(
     portfolio_id: str, portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)]
 ) -> None:
-    portfolio_manager.delete(portfolio_id)
+    await portfolio_manager.delete(portfolio_id)
 
 
 @router.put("/portfolio/{portfolio_id}/add/{wallet_id}", status_code=204)
-def add_wallet_to_portfolio(
+async def add_wallet_to_portfolio(
     portfolio_id: str,
     wallet_id: str,
     portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
 ):
-    portfolio_manager.add_wallet_to_portfolio(portfolio_id, wallet_id)
+    await portfolio_manager.add_wallet_to_portfolio(portfolio_id, wallet_id)
 
 
 @router.put("/portfolio/{portfolio_id}/remove/{wallet_id}", status_code=204)
-def remove_wallet_from_portfolio(
+async def remove_wallet_from_portfolio(
     portfolio_id: str,
     wallet_id: str,
     portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
 ):
-    portfolio_manager.remove_wallet_from_portfolio(portfolio_id, wallet_id)
+    await portfolio_manager.remove_wallet_from_portfolio(portfolio_id, wallet_id)

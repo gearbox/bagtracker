@@ -9,48 +9,48 @@ router = APIRouter()
 
 
 @router.post("/wallet/{username}", response_model=Wallet)
-def add_wallet(
+async def add_wallet(
     username: str,
     wallet: WalletCreateOrUpdate,
     wallet_manager: Annotated[WalletManager, Depends(WalletManager)],
 ) -> Wallet:
-    return Wallet.model_validate(wallet_manager.create(wallet, username))
+    return Wallet.model_validate(await wallet_manager.create(wallet, username))
 
 
 @router.get("/user/wallets/{username}", response_model=WalletAll, tags=["Users"])
-def list_wallets(
+async def list_wallets(
     username: str,
     wallet_manager: Annotated[WalletManager, Depends(WalletManager)],
 ) -> WalletAll:
-    return WalletAll.model_validate({"wallets": wallet_manager.get_all_by_user(username)})
+    return WalletAll.model_validate({"wallets": await wallet_manager.get_all_by_user(username)})
 
 
 @router.get("/wallet/{wallet_id}", response_model=Wallet)
-def get_wallet(wallet_id: str, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]) -> Wallet:
-    return Wallet.model_validate(wallet_manager.get(wallet_id))
+async def get_wallet(wallet_id: str, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]) -> Wallet:
+    return Wallet.model_validate(await wallet_manager.get(wallet_id))
 
 
 @router.get("/wallet/address/{address}", response_model=Wallet)
-def get_wallet_by_address(
+async def get_wallet_by_address(
     address: str, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]
 ) -> Wallet | None:
-    return Wallet.model_validate(wallet_manager.get_by_address(address))
+    return Wallet.model_validate(await wallet_manager.get_by_address(address))
 
 
 @router.put("/wallet/{wallet_id}", response_model=Wallet)
-def update_wallet(
+async def update_wallet(
     wallet_id: str, wallet_data: WalletCreateOrUpdate, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]
 ) -> Wallet:
-    return Wallet.model_validate(wallet_manager.update(wallet_id, wallet_data))
+    return Wallet.model_validate(await wallet_manager.update(wallet_id, wallet_data))
 
 
 @router.patch("/wallet/{wallet_id}", response_model=Wallet)
-def patch_wallet(
+async def patch_wallet(
     wallet_id: str, wallet_data: WalletPatch, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]
 ) -> Wallet:
-    return Wallet.model_validate(wallet_manager.patch(wallet_id, wallet_data))
+    return Wallet.model_validate(await wallet_manager.patch(wallet_id, wallet_data))
 
 
 @router.delete("/wallet/{wallet_id}", response_model=None, status_code=204)
-def delete_wallet(wallet_id: str, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]) -> None:
-    wallet_manager.delete(wallet_id)
+async def delete_wallet(wallet_id: str, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]) -> None:
+    await wallet_manager.delete(wallet_id)

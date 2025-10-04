@@ -25,7 +25,7 @@ class User(Base):
     __tablename__ = "users"
 
     username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
-    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=True)
     email: Mapped[str | None] = mapped_column(String(256), nullable=True)
     name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

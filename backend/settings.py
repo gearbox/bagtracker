@@ -47,7 +47,8 @@ class Settings(BaseSettings):
     postgres_db: str = "dbname"
     postgres_user: str = "user"
     postgres_password: str = "password"
-    db_driver: str = "postgresql+psycopg2"
+    db_driver_async: str = "postgresql+asyncpg"
+    db_driver_sync: str = "postgresql+psycopg"
 
     # Redis
     redis_host: str | None = None
@@ -69,7 +70,7 @@ class Settings(BaseSettings):
 
     # security
     secret_key: str = "my secret key, set in env"
-    algorithm: str = "hs256"
+    algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
     # api keys rotation reminder (days)
@@ -81,14 +82,23 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        """Sync database URL (for Alembic migrations)"""
         return (
-            f"{self.db_driver}://{self.postgres_user}:{self.postgres_password}@"
+            f"{self.db_driver_sync}://{self.postgres_user}:{self.postgres_password}@"
+            f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def async_db_url(self) -> str:
+        """Async database URL (for application runtime)"""
+        return (
+            f"{self.db_driver_async}://{self.postgres_user}:{self.postgres_password}@"
             f"{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
     @property
     def db_type(self) -> str:
-        return DBType[self.db_driver.split("+")[0].upper()].value
+        return DBType[self.db_driver_async.split("+")[0].upper()].value
 
 
 @lru_cache

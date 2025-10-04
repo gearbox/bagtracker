@@ -7,3 +7,4 @@ from backend.managers.transactions import TransactionManager
 from backend.managers.chains import ChainManager
 from backend.managers.base_crud import BaseCRUDManager
 from backend.managers.portfolio import PortfolioManager
+from backend.managers.auth import AuthManager

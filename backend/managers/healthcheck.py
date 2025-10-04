@@ -7,7 +7,7 @@ from redis import Redis
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 
-from backend.databases import get_db_session, get_redis_client
+from backend.databases import get_async_db_session, get_redis_client
 from backend.schemas import APIHealthCheck, DBHealthCheck
 from backend.settings import settings
 
@@ -16,7 +16,7 @@ class HealthCheckManager:
     def __init__(
         self,
         request: Request,
-        db: Annotated[DBSession, Depends(get_db_session)],
+        db: Annotated[DBSession, Depends(get_async_db_session)],
         redis_client: Annotated[Redis, Depends(get_redis_client)],
     ) -> None:
         self.db = db

@@ -114,3 +114,14 @@ class UserMgmt(User):
 
 class UserMgmtAll(BaseModel):
     users: list[UserMgmt] = []
+
+
+class UserLoginInfo(BaseModel):
+    uuid: UUID
+    username: str
+    email: str | None = None
+    name: str | None = None
+    last_name: str | None = None
+    nickname: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -8,7 +8,8 @@ import sqlalchemy.exc
 from loguru import logger
 from sqlalchemy import BigInteger, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, Query, Session, declared_attr, mapped_column
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 from sqlalchemy.sql import func, select, text
 
 from backend.errors import DatabaseError, UnexpectedException
@@ -81,128 +82,135 @@ class Base(DeclarativeBase):
             "eager_defaults": True,  # Fetch server defaults immediately
         }
 
-    @classmethod
-    def query_active(cls: type[T], session: Session) -> Query:
-        """Query only active (non-deleted) records"""
-        return session.query(cls).filter(cls.is_deleted == False)  # noqa: E712
+    # @classmethod
+    # def query_active(cls: type[T], session: AsyncSession) -> Query:
+    #     """Query only active (non-deleted) records"""
+    #     return select(cls).filter(cls.is_deleted == False)  # noqa: E712
 
-    @classmethod
-    def query_with_deleted(cls: type[T], session: Session) -> Query:
-        """Query all records including soft-deleted ones"""
-        return session.query(cls)
+    # @classmethod
+    # def query_with_deleted(cls: type[T], session: AsyncSession) -> Query:
+    #     """Query all records including soft-deleted ones"""
+    #     return session.query(cls)
 
-    def save(self, session: Session, by_user_id: int | None = None, log_action: str | None = None) -> None:
+    async def save(self, session: AsyncSession, by_user_id: int | None = None, log_action: str | None = None) -> None:
         if by_user_id:
             self.updated_by = by_user_id
         self.updated_at = datetime.now(UTC)
         try:
             session.add(self)
-            session.commit()
+            await session.commit()
+            await session.refresh(self)
         except sqlalchemy.exc.IntegrityError as e:
+            await session.rollback()
             raise DatabaseError(status_code=500, exception_message=f"Database integrity error: {str(e)}") from e
         except sqlalchemy.exc.SQLAlchemyError as e:
+            await session.rollback()
             raise DatabaseError(status_code=500, exception_message=f"Internal database error: {str(e)}") from e
         except Exception as e:
+            await session.rollback()
             logger.exception("Unexpected exception occurred during save operation")
             raise UnexpectedException(exception_message=f"Internal server error: {str(e)}") from e
         else:
             if log_action:
                 logger.info(log_action)
 
-    def delete(self, session: Session, by_user_id: int | None = None) -> None:
+    async def delete(self, session: AsyncSession, by_user_id: int | None = None) -> None:
         """Soft delete instead of hard delete"""
         self.is_deleted = True
-        self.save(session, by_user_id, f"Delete record with ID: {self.id}")
+        await self.save(session, by_user_id, f"Delete record with ID: {self.id}")
 
-    def delete_hard(self, session: Session) -> None:
+    async def delete_hard(self, session: AsyncSession) -> None:
         """Hard delete - use with caution"""
         try:
-            session.delete(self)
-            session.commit()
+            await session.delete(self)
+            await session.commit()
         except sqlalchemy.exc.SQLAlchemyError as e:
+            await session.rollback()
             raise DatabaseError(exception_message=f"Internal database error: {str(e)}") from e
         except Exception as e:
+            await session.rollback()
             logger.exception("Unexpected exception occurred during delete operation")
             raise UnexpectedException(exception_message=f"Internal server error: {str(e)}") from e
 
-    def restore(self, session: Session, by_user_id: int | None = None) -> None:
+    async def restore(self, session: AsyncSession, by_user_id: int | None = None) -> None:
         """Restore a soft-deleted record"""
         self.is_deleted = False
-        self.save(session, by_user_id, "Restore record with ID: {self.id}")
+        await self.save(session, by_user_id, "Restore record with ID: {self.id}")
 
     def _assign_attributes(self, assign_dict: dict) -> None:
         for attribute, value in assign_dict.items():
             if hasattr(self, attribute):
                 setattr(self, attribute, value)
 
-    # TODO: Do we really need this method?
-    @classmethod
-    def _create_for_cls(cls: type[T], session: Session, create_dict: dict, by_user_id: int | None = None) -> T:
-        if by_user_id:
-            create_dict["created_by"] = by_user_id
-        instance = cls(**create_dict)
-        session.add(instance)
-        session.commit()
-        session.refresh(instance)
-        return instance
-
-    def create(self, session: Session, create_dict: dict, by_user_id: int | None = None) -> Self:
+    async def create(self, session: AsyncSession, create_dict: dict, by_user_id: int | None = None) -> Self:
         self._assign_attributes(create_dict)
         if by_user_id:
             self.created_by = by_user_id
-        self.save(session, by_user_id, "Creating new record")
+        await self.save(session, by_user_id, "Creating new record")
         return self
 
-    def update(self, session: Session, update_dict: dict, by_user_id: int | None = None) -> Self:
+    async def update(self, session: AsyncSession, update_dict: dict, by_user_id: int | None = None) -> Self:
         self._assign_attributes(update_dict)
-        self.save(session, by_user_id, "Updating record with ID: {self.id}")
+        await self.save(session, by_user_id, "Updating record with ID: {self.id}")
         return self
 
-    def upsert(self, session: Session, upsert_dict: dict, by_user_id: int | None = None) -> Self:
+    async def upsert(self, session: AsyncSession, upsert_dict: dict, by_user_id: int | None = None) -> Self:
         """
         Update existing record or create new one if it doesn't exist.
         If the instance has an ID, it updates; otherwise, it creates.
         """
         if self.id or self.uuid:
-            return self.update(session, upsert_dict, by_user_id)
-        return self.create(session, upsert_dict, by_user_id)
+            return await self.update(session, upsert_dict, by_user_id)
+        return await self.create(session, upsert_dict, by_user_id)
 
     @classmethod
-    def get_by_id(cls: type[T], session: Session, item_id: int, include_deleted: bool = False) -> T:
+    async def get_by_id(cls: type[T], session: AsyncSession, item_id: int, include_deleted: bool = False) -> T:
         """Get by internal BigInteger ID"""
         try:
-            obj = session.get_one(cls, item_id)
+            obj = await session.get_one(cls, item_id)
             if obj.is_deleted and not include_deleted:
                 raise sqlalchemy.exc.NoResultFound()
             return obj
         except sqlalchemy.exc.NoResultFound:
             raise DatabaseError(404, "Object not found") from None
+        except Exception as e:
+            raise DatabaseError(500, f"Database error: {str(e)}") from e
 
     @classmethod
-    def get_by_uuid(cls: type[T], session: Session, item_uuid: "uuid.UUID", include_deleted: bool = False) -> T:
-        """Get by UUID (for API use)"""
-        # query = cls.query_all(session) if include_deleted else cls.query_active(session)
-        # try:
-        #     return query.filter(cls.uuid == item_uuid).one()
-        # except NoResultFound:
-        #     raise DatabaseError(404, "Object not found") from None
-        return cls.get_one(session, include_deleted, uuid=item_uuid)
+    async def get_by_uuid(
+        cls: type[T], session: AsyncSession, item_uuid: "uuid.UUID", include_deleted: bool = False
+    ) -> T:
+        """
+        Get by UUID (for API use). Rises an error if no result found.
+            :rises: :class:`DatabaseError`
+        """
+        return await cls.get_one(session, include_deleted, uuid=item_uuid)
 
     @classmethod
-    def get_one(cls: type[T], session: Session, include_deleted: bool = False, **kwargs) -> T:
-        query = cls.query_with_deleted(session) if include_deleted else cls.query_active(session)
+    async def get_one(cls: type[T], session: AsyncSession, include_deleted: bool = False, **kwargs) -> T:
+        """
+        Get one result or rise
+            :rises: :class:`DatabaseError`
+        """
+        stmt = select(cls).filter_by(**kwargs)
+        if not include_deleted:
+            stmt = stmt.filter(cls.is_deleted == False)  # noqa: E712
+        result = await session.execute(stmt)
         try:
-            return query.filter_by(**kwargs).one()
+            return result.scalar_one()
         except sqlalchemy.exc.NoResultFound:
             raise DatabaseError(404, "Object not found") from None
 
     @classmethod
-    def get_all(cls: type[T], session: Session, include_deleted: bool = False, **kwargs) -> list[T]:
-        query = cls.query_with_deleted(session) if include_deleted else cls.query_active(session)
-        return query.filter_by(**kwargs).all()
+    async def get_all(cls: type[T], session: AsyncSession, include_deleted: bool = False, **kwargs) -> list[T]:
+        stmt = select(cls).filter_by(**kwargs)
+        if not include_deleted:
+            stmt = stmt.filter(cls.is_deleted == False)  # noqa: E712
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
 
     @classmethod
-    def sync_sequence(cls, session: Session, pk_field: str = "id") -> None:
+    async def sync_sequence(cls, session: AsyncSession, pk_field: str = "id") -> None:
         """
         Synchronize the db sequence for the given table's id column.
 
@@ -214,18 +222,20 @@ class Base(DeclarativeBase):
 
         # Step 1: Get the sequence name
         sequence_name_query = text("SELECT pg_get_serial_sequence(:table_name, :id_column)")
-        sequence_name = session.execute(sequence_name_query, {"table_name": table_name, "id_column": pk_field}).scalar()
+        result = await session.execute(sequence_name_query, {"table_name": table_name, "id_column": pk_field})
+        sequence_name = result.scalar()
         if not sequence_name:
             raise ValueError(f"No sequence found for {table_name}.{pk_field}")
 
         # Step 2: Get the maximum ID
         max_id_query = select(func.max(getattr(cls, pk_field)))
-        max_id = session.execute(max_id_query).scalar() or 0  # Default to 0 if table is empty
+        result = await session.execute(max_id_query)
+        max_id = result.scalar() or 0  # Default to 0 if table is empty
 
         # Step 3: Set the sequence to MAX(id) + 1
         alter_sequence_query = text(f"ALTER SEQUENCE {sequence_name} RESTART WITH :next_id")
-        session.execute(alter_sequence_query, {"next_id": max_id + 1})
-        session.commit()  # Commit the sequence change
+        await session.execute(alter_sequence_query, {"next_id": max_id + 1})
+        await session.commit()
 
     def _serialize_value(self, value: Any, preserve_precision: bool = True) -> Any:
         """
