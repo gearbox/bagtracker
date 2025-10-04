@@ -4,14 +4,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Self, TypeVar
 
+import sqlalchemy.exc
 from loguru import logger
 from sqlalchemy import BigInteger, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Query, Session, declared_attr, mapped_column
 from sqlalchemy.sql import func, select, text
 
-from backend.errors import DatabaseError
+from backend.errors import DatabaseError, UnexpectedException
 
 T = TypeVar("T", bound="Base")
 
@@ -72,76 +72,72 @@ class Base(DeclarativeBase):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    created_by: Mapped[int | None] = mapped_column(UUID(as_uuid=True), nullable=True)  # Who created the record
-    updated_by: Mapped[int | None] = mapped_column(UUID(as_uuid=True), nullable=True)  # Who last updated
+    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # Who created the record
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # Who last updated
 
-    def save(self, session: Session, commit: bool = True) -> None:
-        session.add(self)
-        if commit:
+    @declared_attr.directive
+    def __mapper_args__(cls):
+        return {
+            "eager_defaults": True,  # Fetch server defaults immediately
+        }
+
+    @classmethod
+    def query_active(cls: type[T], session: Session) -> Query:
+        """Query only active (non-deleted) records"""
+        return session.query(cls).filter(cls.is_deleted == False)  # noqa: E712
+
+    @classmethod
+    def query_with_deleted(cls: type[T], session: Session) -> Query:
+        """Query all records including soft-deleted ones"""
+        return session.query(cls)
+
+    def save(self, session: Session, by_user_id: int | None = None, log_action: str | None = None) -> None:
+        if by_user_id:
+            self.updated_by = by_user_id
+        self.updated_at = datetime.now(UTC)
+        try:
+            session.add(self)
             session.commit()
+        except sqlalchemy.exc.IntegrityError as e:
+            raise DatabaseError(status_code=500, exception_message=f"Database integrity error: {str(e)}") from e
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            raise DatabaseError(status_code=500, exception_message=f"Internal database error: {str(e)}") from e
+        except Exception as e:
+            logger.exception("Unexpected exception occurred during save operation")
+            raise UnexpectedException(exception_message=f"Internal server error: {str(e)}") from e
+        else:
+            if log_action:
+                logger.info(log_action)
 
     def delete(self, session: Session, by_user_id: int | None = None) -> None:
         """Soft delete instead of hard delete"""
         self.is_deleted = True
-        if by_user_id:
-            self.updated_by = by_user_id
-        self.updated_at = datetime.now(UTC)
-        self.save(session)
+        self.save(session, by_user_id, f"Delete record with ID: {self.id}")
 
     def delete_hard(self, session: Session) -> None:
         """Hard delete - use with caution"""
-        session.delete(self)
-        session.commit()
-
-    @classmethod
-    def get_by_id(cls: type[T], session: Session, item_id: int, include_deleted: bool = False) -> T:
-        """Get by internal BigInteger ID"""
         try:
-            obj = session.get_one(cls, item_id)
-            if obj.is_deleted and not include_deleted:
-                raise DatabaseError(404, "Object not found")
-            return obj
-        except NoResultFound:
-            raise DatabaseError(404, "Object not found") from None
+            session.delete(self)
+            session.commit()
+        except sqlalchemy.exc.SQLAlchemyError as e:
+            raise DatabaseError(exception_message=f"Internal database error: {str(e)}") from e
+        except Exception as e:
+            logger.exception("Unexpected exception occurred during delete operation")
+            raise UnexpectedException(exception_message=f"Internal server error: {str(e)}") from e
 
-    @classmethod
-    def get_by_uuid(cls: type[T], session: Session, item_uuid: "uuid.UUID", include_deleted: bool = False) -> T:
-        """Get by UUID (for API use)"""
-        query = session.query(cls).filter(cls.uuid == item_uuid)
-        if not include_deleted:
-            query = query.filter(cls.is_deleted == False)  # noqa: E712
-        try:
-            return query.one()
-        except NoResultFound:
-            raise DatabaseError(404, "Object not found") from None
+    def restore(self, session: Session, by_user_id: int | None = None) -> None:
+        """Restore a soft-deleted record"""
+        self.is_deleted = False
+        self.save(session, by_user_id, "Restore record with ID: {self.id}")
 
-    @classmethod
-    def get_one_by_kwargs(cls: type[T], session: Session, include_deleted: bool = False, **kwargs) -> T:
-        query = session.query(cls).filter_by(**kwargs)
-        if not include_deleted:
-            query = query.filter(cls.is_deleted == False)  # noqa: E712
-        try:
-            return query.one()
-        except NoResultFound:
-            raise DatabaseError(404, "Object not found") from None
-
-    @classmethod
-    def get_many_by_kwargs(cls: type[T], session: Session, include_deleted: bool = False, **kwargs) -> list[T]:
-        query = session.query(cls).filter_by(**kwargs)
-        if not include_deleted:
-            query = query.filter(cls.is_deleted == False)  # noqa: E712
-        return query.all()
-
-    @classmethod
-    def get_all(cls, session: Session, include_deleted: bool = False) -> list:
-        query = session.query(cls)
-        if not include_deleted:
-            query = query.filter(cls.is_deleted == False)  # noqa: E712
-        return query.all()
+    def _assign_attributes(self, assign_dict: dict) -> None:
+        for attribute, value in assign_dict.items():
+            if hasattr(self, attribute):
+                setattr(self, attribute, value)
 
     # TODO: Do we really need this method?
     @classmethod
-    def create_for_cls(cls: type[T], session: Session, create_dict: dict, by_user_id: int | None = None) -> T:
+    def _create_for_cls(cls: type[T], session: Session, create_dict: dict, by_user_id: int | None = None) -> T:
         if by_user_id:
             create_dict["created_by"] = by_user_id
         instance = cls(**create_dict)
@@ -150,39 +146,60 @@ class Base(DeclarativeBase):
         session.refresh(instance)
         return instance
 
-    def _assign_attributes(self, assign_dict: dict) -> None:
-        for attribute, value in assign_dict.items():
-            if hasattr(self, attribute):
-                setattr(self, attribute, value)
-
-    def create(self, session: Session, create_dict: dict, by_user_id: int | None = None, commit: bool = True) -> Self:
+    def create(self, session: Session, create_dict: dict, by_user_id: int | None = None) -> Self:
         self._assign_attributes(create_dict)
         if by_user_id:
             self.created_by = by_user_id
-        self.save(session, commit)
-        if commit:
-            session.refresh(self)
+        self.save(session, by_user_id, "Creating new record")
         return self
 
-    def update(self, session: Session, update_dict: dict, by_user_id: int | None = None, commit: bool = True) -> Self:
+    def update(self, session: Session, update_dict: dict, by_user_id: int | None = None) -> Self:
         self._assign_attributes(update_dict)
-        if by_user_id:
-            self.updated_by = by_user_id
-        self.updated_at = datetime.now(UTC)
-        self.save(session, commit)
+        self.save(session, by_user_id, "Updating record with ID: {self.id}")
         return self
 
-    def upsert(self, session: Session, upsert_dict: dict, by_user_id: int | None = None, commit: bool = True) -> Self:
+    def upsert(self, session: Session, upsert_dict: dict, by_user_id: int | None = None) -> Self:
         """
         Update existing record or create new one if it doesn't exist.
         If the instance has an ID, it updates; otherwise, it creates.
         """
         if self.id or self.uuid:
-            logger.info("Updating record")
-            return self.update(session, upsert_dict, by_user_id, commit)
-        logger.info("Creating record")
-        self.create(session, upsert_dict, by_user_id, commit)
-        return self
+            return self.update(session, upsert_dict, by_user_id)
+        return self.create(session, upsert_dict, by_user_id)
+
+    @classmethod
+    def get_by_id(cls: type[T], session: Session, item_id: int, include_deleted: bool = False) -> T:
+        """Get by internal BigInteger ID"""
+        try:
+            obj = session.get_one(cls, item_id)
+            if obj.is_deleted and not include_deleted:
+                raise sqlalchemy.exc.NoResultFound()
+            return obj
+        except sqlalchemy.exc.NoResultFound:
+            raise DatabaseError(404, "Object not found") from None
+
+    @classmethod
+    def get_by_uuid(cls: type[T], session: Session, item_uuid: "uuid.UUID", include_deleted: bool = False) -> T:
+        """Get by UUID (for API use)"""
+        # query = cls.query_all(session) if include_deleted else cls.query_active(session)
+        # try:
+        #     return query.filter(cls.uuid == item_uuid).one()
+        # except NoResultFound:
+        #     raise DatabaseError(404, "Object not found") from None
+        return cls.get_one(session, include_deleted, uuid=item_uuid)
+
+    @classmethod
+    def get_one(cls: type[T], session: Session, include_deleted: bool = False, **kwargs) -> T:
+        query = cls.query_with_deleted(session) if include_deleted else cls.query_active(session)
+        try:
+            return query.filter_by(**kwargs).one()
+        except sqlalchemy.exc.NoResultFound:
+            raise DatabaseError(404, "Object not found") from None
+
+    @classmethod
+    def get_all(cls: type[T], session: Session, include_deleted: bool = False, **kwargs) -> list[T]:
+        query = cls.query_with_deleted(session) if include_deleted else cls.query_active(session)
+        return query.filter_by(**kwargs).all()
 
     @classmethod
     def sync_sequence(cls, session: Session, pk_field: str = "id") -> None:

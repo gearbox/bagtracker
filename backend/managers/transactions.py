@@ -31,6 +31,6 @@ class TransactionManager(BaseCRUDManager[Transaction]):
         if wallet_uuid := get_uuid(wallet_id):
             wallet = Wallet.get_by_uuid(self.db, wallet_uuid)
             new_obj = self.model(**transaction, **{"wallet_id": wallet.id})
-            self._save_or_raise(new_obj)
+            new_obj.save(self.db)
             return new_obj
         raise DatabaseError(400, "Wallet does not exists")

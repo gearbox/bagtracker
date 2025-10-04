@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from loguru import logger
 
 from backend.managers import EthereumManager, PortfolioManager, WalletManager
-from backend.schemas import Portfolio, PortfolioAll, PortfolioCreateOrUpdate, PortfolioPatch, Wallet
+from backend.schemas import Portfolio, PortfolioAll, PortfolioCreateOrUpdate, PortfolioPatch
 
 router = APIRouter()
 
@@ -18,20 +18,23 @@ def get_portfolio_demo(
     wallets = wallet_manager.get_all_by_user(user_id)
     portfolio = []
     for wallet in wallets:
-        wallet_model = Wallet.model_validate(wallet)
-        chain = wallet_model.chain
+        chain = wallet.chain
         chain_name = chain.name if chain is not None else "Unknown"
-        chain_native_symbol = chain.native_symbol if chain is not None else "Unknown"
-        if chain_name == "eth":
+
+        # Get native token symbol from tokens table
+        native_token = next((token for token in chain.tokens if token.is_native), None) if chain else None
+        chain_native_symbol = native_token.symbol if native_token else "Unknown"
+
+        if chain_name == "eth-mainnet":
             try:
-                eth_balance = eth_manager.get_balance(wallet_model.address)
-                erc20_balances = eth_manager.get_erc20_balances(wallet_model.address)
+                eth_balance = eth_manager.get_balance(wallet.address)
+                erc20_balances = eth_manager.get_erc20_balances(wallet.address)
             except Exception as e:
-                logger.error(f"Error fetching balances for wallet {wallet_model.address}: {e}")
+                logger.error(f"Error fetching balances for wallet {wallet.address}: {e}")
                 continue
             portfolio.append(
                 {
-                    "wallet": wallet_model.address,
+                    "wallet": wallet.address,
                     "blockchain": chain_name,
                     "balances": [{"symbol": chain_native_symbol, "balance": eth_balance}] + erc20_balances,
                 }

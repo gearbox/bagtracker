@@ -1,8 +1,8 @@
 """init schema
 
-Revision ID: c20f7b1915f5
+Revision ID: 6a25ca2a49ad
 Revises:
-Create Date: 2025-10-02 02:35:25.009372
+Create Date: 2025-10-03 20:52:14.392028
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "c20f7b1915f5"
+revision: str = "6a25ca2a49ad"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -51,8 +51,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
@@ -86,8 +86,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
     )
@@ -120,8 +120,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.CheckConstraint("email ~ '^[a-z0-9._%%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$'", name="check_email_format_lower"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email", name="users_email_key"),
@@ -153,8 +153,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -187,8 +187,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("chain_id", "name", name="uq_rpc_chain_name"),
@@ -235,8 +235,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.CheckConstraint("current_price_usd IS NULL OR current_price_usd >= 0", name="non_negative_price"),
         sa.CheckConstraint("decimals >= 0 AND decimals <= 18", name="safe_decimals_range"),
         sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="RESTRICT"),
@@ -281,8 +281,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(["exchange_id"], ["exchanges.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["portfolio_id"], ["portfolios.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
@@ -321,8 +321,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["portfolio_id"], ["portfolios.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
@@ -363,8 +363,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("wallet_id", sa.BigInteger(), nullable=False),
         sa.Column("chain_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
@@ -412,8 +412,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("wallet_id", sa.BigInteger(), nullable=False),
         sa.Column("chain_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
@@ -470,8 +470,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.ForeignKeyConstraint(
             ["account_id"],
             ["cex_accounts.id"],
@@ -501,8 +501,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("wallet_id", sa.BigInteger(), nullable=False),
         sa.Column("contract_address", sa.String(length=200), nullable=False),
         sa.Column("collection_name", sa.String(length=100), nullable=True),
@@ -545,8 +545,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("wallet_id", sa.BigInteger(), nullable=False),
         sa.Column("contract_address", sa.String(length=200), nullable=False),
         sa.Column("collection_name", sa.String(length=100), nullable=True),
@@ -612,8 +612,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.CheckConstraint("status IN ('pending', 'confirmed', 'failed')", name="valid_status"),
         sa.CheckConstraint("amount >= 0", name="check_amount_non_negative"),
         sa.CheckConstraint("value_usd >= 0", name="check_value_non_negative"),
@@ -665,8 +665,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("subaccount_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
         sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
@@ -714,8 +714,8 @@ def upgrade() -> None:
         sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("created_by", sa.UUID(), nullable=True),
-        sa.Column("updated_by", sa.UUID(), nullable=True),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("subaccount_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
         sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),

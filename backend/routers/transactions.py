@@ -30,7 +30,7 @@ def get_transactions_by_wallet_id(
     wallet_id: str,
     transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)],
 ) -> TransactionsAll:
-    return TransactionsAll.model_validate({"transactions": transaction_manager.get_all_by_kwargs(wallet_id=wallet_id)})
+    return TransactionsAll.model_validate({"transactions": transaction_manager.get_all(wallet_id=wallet_id)})
 
 
 @router.get("/cex/transactions/{cex_account_id}", response_model=TransactionsAll, tags=["CEX"])
@@ -38,9 +38,7 @@ def get_transactions_by_cex_account_id(
     cex_account_id: str,
     transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)],
 ) -> TransactionsAll:
-    return TransactionsAll.model_validate(
-        {"transactions": transaction_manager.get_all_by_kwargs(cex_account_id=cex_account_id)}
-    )
+    return TransactionsAll.model_validate({"transactions": transaction_manager.get_all(cex_account_id=cex_account_id)})
 
 
 @router.get("/transaction/{transaction_id}", response_model=Transaction)
