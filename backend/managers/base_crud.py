@@ -41,16 +41,6 @@ class BaseCRUDManager(ABC, Generic[T]):
     def _model_class(self) -> type[T]:
         pass
 
-    def _apply_eager_loading_simple(self, stmt, eager_load: list[str] | None = None):
-        """Apply eager loading options to a SQLAlchemy statement."""
-        if eager_load := eager_load or self.eager_load:
-            for relationship_name in eager_load:
-                if hasattr(self.model, relationship_name):
-                    stmt = stmt.options(selectinload(getattr(self.model, relationship_name), recursion_depth=3))
-                else:
-                    logger.warning(f"Relationship '{relationship_name}' not found on model {self.model.__name__}")
-        return stmt
-
     def _apply_eager_loading(
         self, stmt: Select, include_deleted: bool = False, eager_load: list[str] | None = None
     ) -> Select:
