@@ -1,10 +1,11 @@
+from collections.abc import Sequence
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from backend.schemas import Chain, Transaction
+from backend.schemas import Chain
 
 
 class WalletType(Enum):
@@ -39,9 +40,9 @@ class WalletPatch(BaseModel):
 class Wallet(WalletBase):
     uuid: UUID
     created_at: datetime
-    transactions: list[Transaction] = []
     chain: Chain | None = None
+    # transactions: list[Transaction] = []
 
 
 class WalletAll(BaseModel):
-    wallets: list[Wallet] = []
+    wallets: Sequence[Wallet] = []

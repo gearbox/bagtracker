@@ -3,10 +3,17 @@ from backend.managers.base_crud import BaseCRUDManager
 
 
 class WalletManager(BaseCRUDManager[Wallet]):
-    # TODO: Soft delete does not work, need to fix it
+    # Define relationships to eager load
+    eager_load = [
+        "chain",  # Load the chain relationship
+        "transactions",  # Load all transactions
+        "balances",  # Load current balances
+        "portfolio",  # Load portfolio if exists
+    ]
+
     @property
     def _model_class(self) -> type[Wallet]:
         return Wallet
 
     async def get_by_address(self, address: str) -> Wallet:
-        return await Wallet.get_one(self.db, address=address)
+        return await self.get_one(address=address)

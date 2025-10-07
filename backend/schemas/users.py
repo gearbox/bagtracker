@@ -1,10 +1,11 @@
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator, model_validator
 
 from backend.errors import UserError
-from backend.schemas import Wallet
+from backend.schemas import Portfolio, Wallet
 from backend.validators import is_uuid
 
 
@@ -91,11 +92,14 @@ class UserPatch(UserBase):
     pass
 
 
-class User(UserBase):
+class UserNew(UserBase):
     uuid: UUID
+
+
+class User(UserNew):
     wallets: list[Wallet] = []
-    portfolios: list = []
-    cex_accounts: list = []
+    portfolios: list[Portfolio] = []
+    # cex_accounts: list = []
 
 
 class UserAll(BaseModel):
@@ -113,7 +117,7 @@ class UserMgmt(User):
 
 
 class UserMgmtAll(BaseModel):
-    users: list[UserMgmt] = []
+    users: Sequence[UserMgmt] = []
 
 
 class UserLoginInfo(BaseModel):

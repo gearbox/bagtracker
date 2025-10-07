@@ -9,7 +9,7 @@ from loguru import logger
 from sqlalchemy import BigInteger, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, selectinload
 from sqlalchemy.sql import func, select, text
 
 from backend.errors import DatabaseError, UnexpectedException
@@ -81,16 +81,6 @@ class Base(DeclarativeBase):
         return {
             "eager_defaults": True,  # Fetch server defaults immediately
         }
-
-    # @classmethod
-    # def query_active(cls: type[T], session: AsyncSession) -> Query:
-    #     """Query only active (non-deleted) records"""
-    #     return select(cls).filter(cls.is_deleted == False)  # noqa: E712
-
-    # @classmethod
-    # def query_with_deleted(cls: type[T], session: AsyncSession) -> Query:
-    #     """Query all records including soft-deleted ones"""
-    #     return session.query(cls)
 
     async def save(self, session: AsyncSession, by_user_id: int | None = None, log_action: str | None = None) -> None:
         if by_user_id:
@@ -178,7 +168,11 @@ class Base(DeclarativeBase):
 
     @classmethod
     async def get_by_uuid(
-        cls: type[T], session: AsyncSession, item_uuid: "uuid.UUID", include_deleted: bool = False
+        cls: type[T],
+        session: AsyncSession,
+        item_uuid: "uuid.UUID",
+        include_deleted: bool = False,
+        eager_load: list | None = None,
     ) -> T:
         """
         Get by UUID (for API use). Rises an error if no result found.
@@ -187,7 +181,12 @@ class Base(DeclarativeBase):
         return await cls.get_one(session, include_deleted, uuid=item_uuid)
 
     @classmethod
-    async def get_one(cls: type[T], session: AsyncSession, include_deleted: bool = False, **kwargs) -> T:
+    async def get_one(
+        cls: type[T],
+        session: AsyncSession,
+        include_deleted: bool = False,
+        **kwargs,
+    ) -> T:
         """
         Get one result or rise
             :rises: :class:`DatabaseError`
@@ -202,10 +201,15 @@ class Base(DeclarativeBase):
             raise DatabaseError(404, "Object not found") from None
 
     @classmethod
-    async def get_all(cls: type[T], session: AsyncSession, include_deleted: bool = False, **kwargs) -> list[T]:
+    async def get_all(
+        cls: type[T], session: AsyncSession, include_deleted: bool = False, eager_load: list | None = None, **kwargs
+    ) -> list[T]:
         stmt = select(cls).filter_by(**kwargs)
         if not include_deleted:
             stmt = stmt.filter(cls.is_deleted == False)  # noqa: E712
+        if eager_load:
+            for relationship in eager_load:
+                stmt = stmt.options(selectinload(relationship))
         result = await session.execute(stmt)
         return list(result.scalars().all())
 

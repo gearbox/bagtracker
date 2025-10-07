@@ -10,18 +10,18 @@ from backend.managers import UserManager
 router = APIRouter()
 
 
-@router.post("/sign-up", response_model=schemas.User, status_code=status_code.HTTP_201_CREATED)
-async def sign_up_user(
+@router.post("/sign-up", response_model=schemas.UserNew, status_code=status_code.HTTP_201_CREATED)
+async def sign_up(
     user: schemas.UserSignUp,
     user_manager: Annotated[UserManager, Depends(UserManager)],
-) -> schemas.User:
-    return schemas.User.model_validate(await user_manager.sign_up(user))
+) -> schemas.UserNew:
+    return schemas.UserNew.model_validate(await user_manager.create_user(user))
 
 
 @router.get("/user/{username}", response_model=schemas.User)
 async def get_user(username: str, user_manager: Annotated[UserManager, Depends(UserManager)]) -> schemas.User:
     user_obj = await user_manager.get_user(username)
-    return schemas.User.model_validate(user_obj.to_schema())
+    return schemas.User.model_validate(user_obj)
 
 
 @router.put("/user/{username}", response_model=schemas.User)
@@ -29,15 +29,15 @@ async def update_user(
     username: str, user: schemas.UserCreateOrUpdate, user_manager: Annotated[UserManager, Depends(UserManager)]
 ) -> schemas.User:
     user_obj = await user_manager.update_user(username, user)
-    return schemas.User.model_validate(user_obj.to_schema())
+    return schemas.User.model_validate(user_obj)
 
 
 @router.patch("/user/{username}", response_model=schemas.User)
 async def patch_user(
-    username: str, user: schemas.UserCreateOrUpdate, user_manager: Annotated[UserManager, Depends(UserManager)]
+    username: str, user: schemas.UserPatch, user_manager: Annotated[UserManager, Depends(UserManager)]
 ) -> schemas.User:
     user_obj = await user_manager.patch_user(username, user)
-    return schemas.User.model_validate(user_obj.to_schema())
+    return schemas.User.model_validate(user_obj)
 
 
 @router.delete("/user/{username}", status_code=status_code.HTTP_204_NO_CONTENT)
@@ -51,20 +51,6 @@ async def delete_user(username: str, user_manager: Annotated[UserManager, Depend
 #################
 
 
-@router.post(
-    "/user-management/user",
-    tags=["User Management"],
-    response_model=schemas.User,
-    status_code=status_code.HTTP_201_CREATED,
-)
-async def create_user(
-    user: schemas.UserCreateOrUpdate,
-    user_manager: Annotated[UserManager, Depends(UserManager)],
-) -> schemas.User:
-    user_obj = await user_manager.create_user(user)
-    return schemas.User.model_validate(user_obj.to_schema())
-
-
 @router.get(
     "/user-management/users",
     tags=["User Management"],
@@ -74,8 +60,8 @@ async def create_user(
 async def get_all_users(
     user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> schemas.UserMgmtAll:
-    users = await user_manager.get_all(include_deleted=True)
-    return schemas.UserMgmtAll.model_validate({"users": users})
+    users = await user_manager.get_all(include_deleted=True, eager_load=[])
+    return schemas.UserMgmtAll(users=users)
 
 
 @router.delete(

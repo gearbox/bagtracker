@@ -6,6 +6,13 @@ from backend.managers.base_crud import BaseCRUDManager
 
 
 class PortfolioManager(BaseCRUDManager[Portfolio]):
+    eager_load = [
+        "owner",
+        "wallets",
+        "wallets.chain",
+        "cex_accounts",
+    ]
+
     @property
     def _model_class(self) -> type[Portfolio]:
         return Portfolio
