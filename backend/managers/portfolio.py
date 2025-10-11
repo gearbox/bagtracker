@@ -20,21 +20,17 @@ class PortfolioManager(BaseCRUDManager[Portfolio]):
     async def add_wallet_to_portfolio(self, portfolio_uuid: str, wallet_uuid: str) -> None:
         portfolio = await self.get(portfolio_uuid)
         wallet = await Wallet.get_by_uuid(self.db, uuid.UUID(wallet_uuid))
-        if wallet is None:
-            raise DatabaseError(404, "Wallet is not found")
         if wallet in portfolio.wallets:
             raise DatabaseError(400, "Wallet is already in the portfolio")
-        portfolio.wallets.append(wallet)
+        wallet.portfolio_id = portfolio.id
         await self.db.commit()
 
     async def remove_wallet_from_portfolio(self, portfolio_uuid: str, wallet_uuid: str) -> None:
         portfolio = await self.get(portfolio_uuid)
         wallet = await Wallet.get_by_uuid(self.db, uuid.UUID(wallet_uuid))
-        if wallet is None:
-            raise DatabaseError(404, "Wallet is not found")
         if wallet not in portfolio.wallets:
             raise DatabaseError(400, "Wallet is not in the portfolio")
-        portfolio.wallets.remove(wallet)
+        wallet.portfolio_id = None
         await self.db.commit()
 
     # def get_portfolio_summary(self, user_id: str) -> dict[str, Any]:

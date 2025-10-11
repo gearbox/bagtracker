@@ -10,6 +10,7 @@ from backend.routers import (
     transactions, 
     portfolio, 
     chains,
+    tokens,
     auth
 )
 
@@ -23,3 +24,4 @@ main_router.include_router(wallets.router, tags=['Wallets'])
 main_router.include_router(transactions.router, tags=['Transactions'])
 main_router.include_router(portfolio.router, tags=['Portfolio'])
 main_router.include_router(chains.router, tags=['Chains'])
+main_router.include_router(tokens.router, tags=['Tokens'])

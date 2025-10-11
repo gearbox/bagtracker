@@ -23,6 +23,11 @@ class PortfolioCreateOrUpdate(PortfolioBase):
     pass
 
 
+class PortfolioCreateOrUpdateResponse(PortfolioBase):
+    uuid: UUID
+    created_at: datetime
+
+
 class PortfolioPatch(BaseModel):
     name: str | None = None
     memo: str | None = None

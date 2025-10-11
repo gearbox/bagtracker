@@ -14,7 +14,7 @@ async def add_wallet(
     wallet: WalletCreateOrUpdate,
     wallet_manager: Annotated[WalletManager, Depends(WalletManager)],
 ) -> Wallet:
-    return Wallet.model_validate(await wallet_manager.create(wallet, username))
+    return Wallet.model_validate(await wallet_manager.create_from_schema(wallet, username))
 
 
 @router.get("/user/wallets/{username}", response_model=WalletAll, tags=["Users"])

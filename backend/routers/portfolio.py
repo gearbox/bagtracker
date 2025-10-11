@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends
 from loguru import logger
 
 from backend.managers import EthereumManager, PortfolioManager, WalletManager
-from backend.schemas import Portfolio, PortfolioAll, PortfolioCreateOrUpdate, PortfolioPatch
+from backend.schemas import (
+    Portfolio,
+    PortfolioAll,
+    PortfolioCreateOrUpdate,
+    PortfolioCreateOrUpdateResponse,
+    PortfolioPatch,
+)
 
 router = APIRouter()
 
@@ -42,13 +48,15 @@ async def get_portfolio_demo(
     return {"user_id": user_id, "portfolio": portfolio}
 
 
-@router.post("/portfolio/{username}", response_model=Portfolio)
+@router.post("/portfolio/{username}", response_model=PortfolioCreateOrUpdateResponse)
 async def create_portfolio(
     username: str,
     portfolio: PortfolioCreateOrUpdate,
     portfolio_manager: Annotated[PortfolioManager, Depends(PortfolioManager)],
-) -> Portfolio:
-    return Portfolio.model_validate(await portfolio_manager.create(portfolio, username))
+) -> PortfolioCreateOrUpdateResponse:
+    return PortfolioCreateOrUpdateResponse.model_validate(
+        await portfolio_manager.create_from_schema(portfolio, username)
+    )
 
 
 @router.get("/portfolios/{username}", response_model=PortfolioAll)

@@ -1,8 +1,8 @@
 """init schema
 
-Revision ID: 6a25ca2a49ad
+Revision ID: c89865e4f1a7
 Revises:
-Create Date: 2025-10-03 20:52:14.392028
+Create Date: 2025-10-12 01:42:29.720592
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "6a25ca2a49ad"
+revision: str = "c89865e4f1a7"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -124,10 +124,12 @@ def upgrade() -> None:
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.CheckConstraint("email ~ '^[a-z0-9._%%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$'", name="check_email_format_lower"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("email", name="users_email_key"),
     )
     op.create_index(op.f("ix_users_created_at"), "users", ["created_at"], unique=False)
-    op.create_index(op.f("ix_users_username"), "users", ["username"], unique=True)
+    op.create_index("ix_users_email_active", "users", ["email"], unique=True, postgresql_where="is_deleted = false")
+    op.create_index(
+        "ix_users_username_active", "users", ["username"], unique=True, postgresql_where="is_deleted = false"
+    )
     op.create_index(op.f("ix_users_uuid"), "users", ["uuid"], unique=False)
     op.create_table(
         "portfolios",
@@ -578,11 +580,7 @@ def upgrade() -> None:
         sa.Column("block_number", sa.BigInteger(), nullable=True),
         sa.Column("transaction_index", sa.Integer(), nullable=True),
         sa.Column("transaction_type", sa.String(length=20), nullable=False),
-        sa.Column(
-            "status",
-            sa.Enum("PENDING", "CONFIRMED", "FAILED", name="transactionstatus", native_enum=False),
-            nullable=False,
-        ),
+        sa.Column("status", sa.String(length=10), nullable=False),
         sa.Column("counterparty_addr", sa.String(length=100), nullable=True),
         sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
         sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
@@ -593,7 +591,7 @@ def upgrade() -> None:
         sa.Column("fee_currency", sa.String(length=20), nullable=False),
         sa.Column("block_timestamp", sa.DateTime(timezone=True), nullable=True),
         sa.Column("detected_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("timestamp", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column("timestamp", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column(
             "id",
             sa.BigInteger(),
@@ -614,7 +612,6 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("created_by", sa.BigInteger(), nullable=True),
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
-        sa.CheckConstraint("status IN ('pending', 'confirmed', 'failed')", name="valid_status"),
         sa.CheckConstraint("amount >= 0", name="check_amount_non_negative"),
         sa.CheckConstraint("value_usd >= 0", name="check_value_non_negative"),
         sa.CheckConstraint("wallet_id IS NOT NULL OR cex_account_id IS NOT NULL", name="check_has_owner"),
@@ -834,7 +831,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_portfolios_created_at"), table_name="portfolios")
     op.drop_table("portfolios")
     op.drop_index(op.f("ix_users_uuid"), table_name="users")
-    op.drop_index(op.f("ix_users_username"), table_name="users")
+    op.drop_index("ix_users_username_active", table_name="users", postgresql_where="is_deleted = false")
+    op.drop_index("ix_users_email_active", table_name="users", postgresql_where="is_deleted = false")
     op.drop_index(op.f("ix_users_created_at"), table_name="users")
     op.drop_table("users")
     op.drop_index(op.f("ix_exchanges_uuid"), table_name="exchanges")

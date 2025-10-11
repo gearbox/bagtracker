@@ -24,7 +24,7 @@ from backend.security.encryption import EncryptedString
 class User(Base):
     __tablename__ = "users"
 
-    username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=True)
     email: Mapped[str | None] = mapped_column(String(256), nullable=True)
     name: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -37,7 +37,8 @@ class User(Base):
     cex_accounts = relationship("CexAccount", back_populates="owner", cascade="all, delete-orphan")
 
     __table_args__ = (
-        UniqueConstraint("email", name="users_email_key"),
+        Index("ix_users_username_active", "username", unique=True, postgresql_where="is_deleted = false"),
+        Index("ix_users_email_active", "email", unique=True, postgresql_where="is_deleted = false"),
         CheckConstraint(r"email ~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'", name="check_email_format_lower"),
     )
 

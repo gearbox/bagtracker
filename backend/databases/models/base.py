@@ -172,7 +172,6 @@ class Base(DeclarativeBase):
         session: AsyncSession,
         item_uuid: "uuid.UUID",
         include_deleted: bool = False,
-        eager_load: list | None = None,
     ) -> T:
         """
         Get by UUID (for API use). Rises an error if no result found.

@@ -1,6 +1,5 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
-from enum import StrEnum
 
 from sqlalchemy import (
     JSON,
@@ -8,7 +7,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -21,12 +19,6 @@ from sqlalchemy.orm import Mapped, declarative_mixin, mapped_column, relationshi
 from sqlalchemy.sql import func
 
 from backend.databases.models import Base
-
-
-class TransactionStatus(StrEnum):
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
-    FAILED = "failed"
 
 
 class Transaction(Base):
@@ -49,9 +41,7 @@ class Transaction(Base):
     block_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     transaction_index: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Transaction index in block
     transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    status: Mapped[str] = mapped_column(
-        Enum(TransactionStatus, native_enum=False), nullable=False, default=TransactionStatus.CONFIRMED
-    )  # pending, confirmed, failed
+    status: Mapped[str] = mapped_column(String(10), nullable=False)  # pending, confirmed, failed
     counterparty_addr: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. counterparty address
 
     # Amount/price
@@ -72,7 +62,7 @@ class Transaction(Base):
     block_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     token = relationship("Token", back_populates="transactions")
     chain = relationship("Chain", back_populates="transactions")
@@ -83,9 +73,6 @@ class Transaction(Base):
         CheckConstraint("amount >= 0", name="check_amount_non_negative"),
         CheckConstraint("value_usd >= 0", name="check_value_non_negative"),
         CheckConstraint("wallet_id IS NOT NULL OR cex_account_id IS NOT NULL", name="check_has_owner"),
-        CheckConstraint(
-            f"status IN ('{"', '".join(status.value for status in TransactionStatus)}')", name="valid_status"
-        ),
         Index("uq_tx_hash_chain", "transaction_hash", "chain_id", unique=True),
         # Performance indexes
         Index("idx_tx_wallet_time", "wallet_id", "timestamp"),

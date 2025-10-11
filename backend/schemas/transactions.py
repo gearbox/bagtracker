@@ -1,4 +1,4 @@
-import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
@@ -13,45 +13,75 @@ class TransactionType(StrEnum):
     TRANSFER_OUT = "transfer_out"
 
 
+class TransactionStatus(StrEnum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class TransactionBase(BaseModel):
-    wallet_id: UUID | None = None
-    cex_account_id: UUID | None = None
-    tx_hash: str | None = None
-    tx_type: TransactionType
+    chain_id: int | None = None
+    token_id: int | None = None
+
+    transaction_hash: str | None = None
+    block_number: int | None = None
+    transaction_index: int | None = None
+    transaction_type: TransactionType = TransactionType.BUY
+    status: TransactionStatus = TransactionStatus.CONFIRMED
     counterparty_addr: str | None = None
-    symbol: str
+    # symbol: str
     amount: Decimal = Decimal("0.00")
     value_usd: Decimal = Decimal("0.00")
+    price_usd: Decimal = Decimal("0.00")
+
+    gas_used: int | None = 0
+    gas_price: Decimal | None = Decimal("0.00")
     fee_value: Decimal = Decimal("0.00")
     fee_currency: str = "USD"
-    timestamp: datetime.datetime
+
+    block_timestamp: datetime | None = datetime.now(UTC)
+    detected_at: datetime | None = datetime.now(UTC)
+    timestamp: datetime = datetime.now(UTC)
 
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
 
 class TransactionCreateOrUpdate(TransactionBase):
-    pass
+    wallet_uuid: UUID | None = None
+    cex_account_uuid: UUID | None = None
 
 
 class TransactionPatch(BaseModel):
-    wallet_id: UUID | None = None
-    cex_account_id: UUID | None = None
-    tx_hash: str | None = None
-    tx_type: TransactionType | None = None
+    chain_id: int | None = None
+    token_id: int | None = None
+
+    transaction_hash: str | None = None
+    block_number: int | None = None
+    transaction_index: int | None = None
+    transaction_type: TransactionType = TransactionType.BUY
+    status: TransactionStatus = TransactionStatus.CONFIRMED
     counterparty_addr: str | None = None
-    symbol: str | None = None
-    amount: Decimal | None = Decimal("0.00")
-    value_usd: Decimal | None = Decimal("0.00")
-    fee_value: Decimal | None = Decimal("0.00")
-    fee_currency: str | None = "USD"
-    timestamp: datetime.datetime | None = None
+    # symbol: str
+    amount: Decimal = Decimal("0.00")
+    value_usd: Decimal = Decimal("0.00")
+    price_usd: Decimal = Decimal("0.00")
+
+    gas_used: int | None = 0
+    gas_price: Decimal | None = Decimal("0.00")
+    fee_value: Decimal = Decimal("0.00")
+    fee_currency: str = "USD"
+
+    block_timestamp: datetime | None = datetime.now(UTC)
+    detected_at: datetime | None = datetime.now(UTC)
+    timestamp: datetime = datetime.now(UTC)
 
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
 
 class Transaction(TransactionBase):
-    id: UUID
-    created_at: datetime.datetime
+    uuid: UUID
+    created_at: datetime
 
 
 class TransactionsAll(BaseModel):

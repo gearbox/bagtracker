@@ -59,6 +59,8 @@ class BaseCRUDManager(ABC, Generic[T]):
             stmt: the SQLAlchemy statement with eager loading
         """
         if eager_load := eager_load or self.eager_load:
+            logger.debug("Apply eager loading")
+
             for relationship_path in eager_load:
                 # Split by dot to support nested relationships
                 parts = relationship_path.split(".")
@@ -164,10 +166,13 @@ class BaseCRUDManager(ABC, Generic[T]):
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
-    async def get_one(self, include_deleted: bool = False, eager_load: list[str] | None = None, **kwargs) -> T:
+    async def get_one(self, include_deleted: bool = False, eager_load: list[str] | bool | None = None, **kwargs) -> T:
         try:
             stmt = self._get_by_kwargs(include_deleted, **kwargs)
-            stmt = self._apply_eager_loading(stmt, include_deleted, eager_load)
+            if eager_load in {None, True}:
+                eager_load = []
+            if isinstance(eager_load, list):
+                stmt = self._apply_eager_loading(stmt, include_deleted, eager_load)
             result = await self.db.execute(stmt)
             return result.scalar_one()
         except sqlalchemy.exc.NoResultFound:
@@ -194,23 +199,28 @@ class BaseCRUDManager(ABC, Generic[T]):
         else:
             return await self.get_one(include_deleted, eager_load, **fiter_by)
 
-    async def create(self, obj_data: schemas.BaseModel, for_username_or_id: str | None = None) -> T:
-        create_dict = obj_data.model_dump(exclude_unset=True)
+    async def create(self, create_dict: dict, by_user_id: int | None = None) -> T:
         with contextlib.suppress(KeyError):
             await self._error_if_exists(create_dict["uuid"])
+        new_obj = self.model()
+        logger.debug(f"CREATE DICT: {create_dict}")
+        created_obj = await new_obj.create(self.db, create_dict, by_user_id)
+
+        # Refresh with eager loading
+        # FIXME: eager refresh is not working with nested relationships
+        # if self.eager_load:
+        #     await self.db.refresh(created_obj, self.eager_load)
+        return await self.get_one(id=created_obj.id)
+
+    async def create_from_schema(self, obj_data: schemas.BaseModel, for_username_or_id: str | None = None) -> T:
+        create_dict = obj_data.model_dump(exclude_unset=True)
         user_id = None
         if for_username_or_id:
             user = await self.get_user_by_name_or_uuid(for_username_or_id)
             user_id = user.id
             create_dict["user_id"] = user_id
             logger.debug(f"Create object for {for_username_or_id}. Find user {user}")
-        new_obj = self.model()
-        created_obj = await new_obj.create(self.db, create_dict, user_id)
-
-        # Refresh with eager loading
-        if self.eager_load:
-            await self.db.refresh(created_obj, self.eager_load)
-        return created_obj
+        return await self.create(create_dict, user_id)
 
     async def update(self, obj_id: int | uuid.UUID | str, obj_data: schemas.BaseModel) -> T:
         obj = await self.get(obj_id)

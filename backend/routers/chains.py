@@ -14,7 +14,7 @@ async def create_chain(
     chain_manager: Annotated[ChainManager, Depends(ChainManager)],
 ) -> Chain:
     await chain_manager.sync_sequence()
-    return Chain.model_validate(await chain_manager.create(chain))
+    return Chain.model_validate(await chain_manager.create_from_schema(chain))
 
 
 @router.get("/chains/", response_model=list[Chain])
