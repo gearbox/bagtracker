@@ -153,7 +153,7 @@ class RPC(Base):
 
     __tablename__ = "rpcs"
 
-    chain_id = mapped_column(BigInteger, ForeignKey("chains.id", ondelete="CASCADE"), nullable=False)
+    chain_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chains.id", ondelete="RESTRICT"), nullable=False)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     rpc_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # optional: e.g. "mainnet.infura.io"
     is_failover_url: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

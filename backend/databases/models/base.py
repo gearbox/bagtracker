@@ -219,13 +219,13 @@ class Base(DeclarativeBase):
 
         Args:
             session: SQLAlchemy session object
-            id_column: The name of the ID column to synchronize (default is "id")
+            pk_field: The name of the ID column to synchronize (default is "id")
         """
         table_name = cls.__tablename__
 
         # Step 1: Get the sequence name
-        sequence_name_query = text("SELECT pg_get_serial_sequence(:table_name, :id_column)")
-        result = await session.execute(sequence_name_query, {"table_name": table_name, "id_column": pk_field})
+        sequence_name_query = text("SELECT pg_get_serial_sequence(:table_name, :pk_field)")
+        result = await session.execute(sequence_name_query, {"table_name": table_name, "pk_field": pk_field})
         sequence_name = result.scalar()
         if not sequence_name:
             raise ValueError(f"No sequence found for {table_name}.{pk_field}")
@@ -236,9 +236,13 @@ class Base(DeclarativeBase):
         max_id = result.scalar() or 0  # Default to 0 if table is empty
 
         # Step 3: Set the sequence to MAX(id) + 1
-        alter_sequence_query = text(f"ALTER SEQUENCE {sequence_name} RESTART WITH :next_id")
-        await session.execute(alter_sequence_query, {"next_id": max_id + 1})
-        await session.commit()
+        alter_sequence_query = text(f"ALTER SEQUENCE {sequence_name} RESTART WITH {max_id + 1}")
+        try:
+            await session.execute(alter_sequence_query)
+        except Exception as e:
+            logger.warning(f"Could not set the sequence to MAX(id) + 1 = {max_id + 1}. Error: {str(e)}")
+        else:
+            await session.commit()
 
     def _serialize_value(self, value: Any, preserve_precision: bool = True) -> Any:
         """

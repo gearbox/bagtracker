@@ -1,8 +1,8 @@
 """init schema
 
-Revision ID: c89865e4f1a7
+Revision ID: 3ed618a58194
 Revises:
-Create Date: 2025-10-12 01:42:29.720592
+Create Date: 2025-10-13 02:52:26.201068
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "c89865e4f1a7"
+revision: str = "3ed618a58194"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -191,7 +191,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("created_by", sa.BigInteger(), nullable=True),
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
-        sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("chain_id", "name", name="uq_rpc_chain_name"),
         sa.UniqueConstraint("name"),

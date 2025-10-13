@@ -11,7 +11,8 @@ from backend.routers import (
     portfolio, 
     chains,
     tokens,
-    auth
+    rpcs,
+    auth,
 )
 
 main_router = APIRouter(dependencies=common)
@@ -25,3 +26,4 @@ main_router.include_router(transactions.router, tags=['Transactions'])
 main_router.include_router(portfolio.router, tags=['Portfolio'])
 main_router.include_router(chains.router, tags=['Chains'])
 main_router.include_router(tokens.router, tags=['Tokens'])
+main_router.include_router(rpcs.router, tags=['RPCs'])

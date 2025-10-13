@@ -1,10 +1,10 @@
 from collections.abc import Sequence
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
-class BaseToken(BaseModel):
+class TokenBase(BaseModel):
     chain_id: int
     symbol: str
     name: str | None = None
@@ -30,11 +30,15 @@ class BaseToken(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TokenCreateOrUpdate(BaseToken):
-    pass
+class TokenCreateOrUpdate(TokenBase):
+    @model_validator(mode="after")
+    def contract_address_to_lowercase(self):
+        if self.contract_address:
+            self.contract_address_lowercase = self.contract_address.lower()
+        return self
 
 
-class Token(BaseToken):
+class Token(TokenBase):
     id: int
 
 
@@ -66,3 +70,9 @@ class TokenPatch(BaseModel):
     whitepaper_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def contract_address_to_lowercase(self):
+        if self.contract_address:
+            self.contract_address_lowercase = self.contract_address.lower()
+        return self

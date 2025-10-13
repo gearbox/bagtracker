@@ -6,6 +6,7 @@ from backend.managers.wallets import WalletManager
 from backend.managers.transactions import TransactionManager
 from backend.managers.chains import ChainManager
 from backend.managers.tokens import TokenManager
+from backend.managers.rpcs import RpcManager
 from backend.managers.base_crud import BaseCRUDManager
 from backend.managers.portfolio import PortfolioManager
 from backend.managers.auth import AuthManager
