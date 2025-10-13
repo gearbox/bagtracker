@@ -1,4 +1,3 @@
-import tomllib
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
@@ -35,18 +34,29 @@ async def lifespan(app: FastAPI):
     await close_async_database()
 
 
+def get_app_version() -> str:
+    """
+    Get application version from generated version file.
+    Falls back to environment variable or default.
+    """
+    try:
+        from backend._version import __version__
+
+        return __version__
+    except ImportError:
+        logger.warning("Version file not found, using fallback")
+        return "0.0.0-dev"
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
+        title=settings.app_name,
+        version=get_app_version(),
         docs_url=None,
         lifespan=lifespan,
     )
-    try:
-        with open("pyproject.toml", mode="rb") as config:
-            metadata = tomllib.load(config)
-        app.version = metadata["project"]["version"]
-    except Exception as e:
-        logger.error(f"Failed to load project version from pyproject.toml: {e}")
-    app.title = settings.app_name
+    logger.info(f"🔄 Starting {app.title} v{app.version}")
+
     app.include_router(routers.main_router)
     app.add_exception_handler(Exception, errors.handle_exception)
 

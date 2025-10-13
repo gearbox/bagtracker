@@ -1,13 +1,12 @@
 [project]
 name = "bagtracker"
-version = "v0.0.4"
+version = "0.0.7"
 description = "Bag Tracker. Track Your Bags. Embrace the Rekt."
 authors = ["Mihail Tayrov <mtayrov@gmail.com>"]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.17.0",
-    "gunicorn>=23.0.0",
     "uvicorn>=0.37.0",
     "fastapi[standard]>=0.118.3",
     "pydantic-settings>=2.11.0",

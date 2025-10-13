@@ -4,20 +4,15 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-class APIHealthCheck(BaseModel):
-    status: bool = True
-    start_time: datetime | None = None
-    uptime_sec: int = 0
-    message: str = "API healthcheck Ok"
-
-
-class DBHealthCheck(BaseModel):
+class HealthCheck(BaseModel):
     status: Literal[True, False, "Disabled"] = True
+    start_time: datetime | None = None
+    uptime_sec: int | None = None
     message: str = "Healthcheck Ok"
 
 
 class HealthCheckResponse(BaseModel):
     status: bool
-    status_api: APIHealthCheck
-    status_db: DBHealthCheck
-    status_redis: DBHealthCheck
+    status_api: HealthCheck
+    status_db: HealthCheck
+    status_redis: HealthCheck

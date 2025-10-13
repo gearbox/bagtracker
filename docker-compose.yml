@@ -2,7 +2,7 @@ name: $COMPOSE_PROJECT_NAME
 services:
   app-backend:
     environment:
-      - UVICORN_WORKERS=${UVICORN_WORKERS}
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-4}
       - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
       - BACKEND_HOST=${BACKEND_HOST}
       - BACKEND_PORT=${BACKEND_PORT}
@@ -37,12 +37,12 @@ services:
         condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "/bin/bash -c 'exec 3<>/dev/tcp/$BACKEND_HOST/$BACKEND_PORT;echo -e \"GET /healthcheck HTTP/1.1\r\nhost: http://$BACKEND_HOST\r\nConnection: close\r\n\r\n\" >&3;grep \"HTTP/1.1 200 OK\" <&3'" ]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 5
     entrypoint: [
       "/bin/bash", "-c", 
-      "alembic upgrade head && gunicorn -w $UVICORN_WORKERS -k uvicorn.workers.UvicornWorker -b $BACKEND_HOST:$BACKEND_PORT --timeout 180 --access-logfile - --error-logfile - backend.asgi:app"
+      "alembic upgrade head && uvicorn backend.asgi:app --host $BACKEND_HOST --port $BACKEND_PORT --workers $UVICORN_WORKERS --timeout-keep-alive 180 --log-level info"
     ]
     restart: always
 

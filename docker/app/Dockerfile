@@ -1,11 +1,12 @@
 # Use a Python image with uv pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 # Install the project into `/app`
 WORKDIR /app
-COPY ./static /app/static
 
-ENV PYTHONUNBUFFERED=1
+# Copy dependency files and version script
+COPY pyproject.toml uv.lock ./
+COPY scripts/extract_version.py ./scripts/
 
 # Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1
@@ -13,30 +14,34 @@ ENV UV_COMPILE_BYTECODE=1
 # Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
 
-ADD ./alembic.ini /app/alembic.ini
-ADD ./backend /app/backend
-# Install the project's dependencies using the lockfile and settings
+# Install the project's dependencies
+# RUN --mount=type=cache,target=/root/.cache/uv \
+#     --mount=type=bind,source=uv.lock,target=uv.lock \
+#     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+#     uv sync --frozen --no-dev
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-dev
 
-# Then, add the rest of the project source code and install it
-# Installing separately from its dependencies allows optimal layer caching
-COPY ./pyproject.toml /app/pyproject.toml
-COPY ./uv.lock /app/uv.lock    
+# Extract version and create version file
+RUN python scripts/extract_version.py
 
-# Place executables in the environment at the front of the path
+# Runtime stage - no pyproject.toml here
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+COPY ./alembic.ini /app/alembic.ini
+COPY ./static /app/static
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy version file (not pyproject.toml)
+COPY --from=builder /app/backend/_version.py /app/backend/
+COPY ./backend /app/backend
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
-
-# Run the FastAPI application by default
-# Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
-# Uses `--host 0.0.0.0` to allow access from outside the container
-#CMD ["fastapi", "dev", "--host", "0.0.0.0", "backend/asgi.py"]
-
-#CMD ["fastapi", "run", "backend/asgi.py", "--proxy-headers", "--port", "80"]
-#CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:80", "--timeout", "180", "--access-logfile", "-", "--error-logfile", "-", "backend.asgi:app"]
-# CMD gunicorn -w $UVICORN_WORKERS -k uvicorn.workers.UvicornWorker -b $BACKEND_HOST:$BACKEND_PORT --timeout 180 --access-logfile - --error-logfile - backend.asgi:app
