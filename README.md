@@ -127,3 +127,46 @@ For example:
     ```shell
     python -m backend.seeds.seed chains status
     ```
+### Updating files in the `static` folder (openapi/swagger, redoc)
+The project uses locally hosted OpenAPI/Swagger UI assets for reliability. These files are stored in `static/openapi/` and include:
+
+- `swagger-ui-bundle.js` - Swagger UI JavaScript bundle
+- `swagger-ui.css` - Swagger UI styles
+- `redoc.standalone.js` - ReDoc standalone bundle
+- `favicon.png` - FastAPI favicon
+
+#### The Python script is provided to download/update these assets from official CDN sources
+```bash
+# Update to latest versions
+python scripts/update_openapi_assets.py
+
+# Update to specific versions
+python scripts/update_openapi_assets.py --swagger-version 5.10.0 --redoc-version 2.1.0
+
+# Skip favicon download
+python scripts/update_openapi_assets.py --skip-favicon
+
+# View help
+python scripts/update_openapi_assets.py --help
+```
+**Requirements:** `requests` library (already in project dependencies)
+
+### Manual Update
+
+If you prefer to manually download the files:
+
+1. **Swagger UI**: Visit https://github.com/swagger-api/swagger-ui/releases
+   - Download `swagger-ui-bundle.js` and `swagger-ui.css` from the `dist` folder
+
+2. **ReDoc**: Visit https://github.com/Redocly/redoc/releases
+   - Download `redoc.standalone.js` from the bundles
+
+3. Place all files in the `static/openapi/` directory
+
+### Verifying Assets
+
+After updating, test the documentation endpoints:
+- Swagger UI: http://localhost:8080/docs
+- ReDoc: http://localhost:8080/redoc
+
+The assets should load without errors in the browser console.
