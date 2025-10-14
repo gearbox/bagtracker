@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Extract version from pyproject.toml and create _version.py"""
+"""
+Extract version from pyproject.toml and create _version.py
+
+Usage:
+    python scripts/extract_version.py
+"""
 
 import tomllib
 from pathlib import Path

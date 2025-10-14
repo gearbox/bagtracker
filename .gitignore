@@ -12,5 +12,4 @@ var
 .env
 ___*
 /docker/var/
-gunicorn.conf.py
 backend/_version.py

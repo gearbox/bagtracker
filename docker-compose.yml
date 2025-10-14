@@ -40,10 +40,21 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
+    # Option 1: Using Python directly (Production)
+    # entrypoint: [
+    #   "/bin/bash", "-c", 
+    #   "alembic upgrade head && python -c 'from backend.asgi import run_production; run_production()'"
+    # ]
+    # Option 2: Using Python directly (DEVELOPMENT)
     entrypoint: [
       "/bin/bash", "-c", 
-      "alembic upgrade head && uvicorn backend.asgi:app --host $BACKEND_HOST --port $BACKEND_PORT --workers $UVICORN_WORKERS --timeout-keep-alive 180 --log-level info"
+      "alembic upgrade head && python -c 'from backend.asgi import run_uvicorn; run_uvicorn()'"
     ]
+    # Option 3: Using command line with config
+    # entrypoint: [
+    #   "/bin/bash", "-c", 
+    #   "alembic upgrade head && uvicorn backend.asgi:app --host $BACKEND_HOST --port $BACKEND_PORT --workers $UVICORN_WORKERS --timeout-keep-alive 180 --log-level info"
+    # ]
     restart: always
 
   db:

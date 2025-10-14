@@ -1,6 +1,6 @@
 [project]
 name = "bagtracker"
-version = "0.0.7"
+version = "0.0.8"
 description = "Bag Tracker. Track Your Bags. Embrace the Rekt."
 authors = ["Mihail Tayrov <mtayrov@gmail.com>"]
 readme = "README.md"
@@ -51,9 +51,7 @@ exclude = [
     "dist",
     "node_modules",
     "site-packages",
-    "venv",
-    "gunicorn.conf.py",
-    "gunicorn.conf.example.py"
+    "venv"
 ]
 
 extend-exclude = ["tests", ".eggs"]

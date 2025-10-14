@@ -61,10 +61,22 @@ To set up a development environment, follow these steps:
         ```shell
         fastapi run backend/asgi.py --proxy-headers --port 80
         ```
-    - Using Gunicorn:
+    - Using asgi.py
         ```shell
-        gunicorn -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:80 --timeout 180 --access-logfile - --error-logfile - backend.asgi:app
+        python -m backend.asgi
         ```
+    - Using direct Uvicorn
+        ```shell
+        python -m uvicorn backend.asgi:app --reload --host 0.0.0.0 --port 8080
+        ```
+
+### Setting up the application name and version
+We use the `pyproject.toml` project fields `name` and `version` (semver versioning syle).
+During the Docker container build process docker runs the `scripts/extract_version.py` script and generates `backend/_version.py` with the corresponding version. 
+If you run the project locally and there is no generated `backend/_version.py` file, it will fall back to the `0.0.0-dev` version (will be shown in the Swagger UI). If you would like to see the actual app version, you can run the `scripts/extract_version.py` script manually by running the following command in your terminal from the root directory of the project:
+```shell
+python scripts/extract_version.py
+```
 
 ### Using `ruff` linter
 - Automatic run using `pre-commit`
@@ -104,6 +116,13 @@ To set up a development environment, follow these steps:
     alembic current
     ```
 
+### Uvicorn configuration
+The Uvicorn configuration is located in the `uvicorn_config.py` file.
+It is recommended to verify the config validity after any manual changes using the `scripts/verify_uvicorn_config.py` script by running the command from the project root directory:
+```shell
+python scripts/verify_uvicorn_config.py
+```
+
 ### Seeding the Database
 To seed the database with initial data, use the following command:
 ```shell
@@ -136,7 +155,7 @@ The project uses locally hosted OpenAPI/Swagger UI assets for reliability. These
 - `favicon.png` - FastAPI favicon
 
 #### The Python script is provided to download/update these assets from official CDN sources
-```bash
+```shell
 # Update to latest versions
 python scripts/update_openapi_assets.py
 
@@ -151,7 +170,7 @@ python scripts/update_openapi_assets.py --help
 ```
 **Requirements:** `requests` library (already in project dependencies)
 
-### Manual Update
+#### Manual Update
 
 If you prefer to manually download the files:
 
@@ -163,7 +182,7 @@ If you prefer to manually download the files:
 
 3. Place all files in the `static/openapi/` directory
 
-### Verifying Assets
+#### Verifying Assets
 
 After updating, test the documentation endpoints:
 - Swagger UI: http://localhost:8080/docs

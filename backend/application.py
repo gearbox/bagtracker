@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
         docs_url=None,
         lifespan=lifespan,
     )
-    logger.info(f"🔄 Starting {app.title} v{app.version}")
+    logger.info(f"🚀 Starting {app.title} v{app.version}")
 
     app.include_router(routers.main_router)
     app.add_exception_handler(Exception, errors.handle_exception)

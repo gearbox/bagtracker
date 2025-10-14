@@ -15,11 +15,9 @@ ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
 # Install the project's dependencies
-# RUN --mount=type=cache,target=/root/.cache/uv \
-#     --mount=type=bind,source=uv.lock,target=uv.lock \
-#     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-#     uv sync --frozen --no-dev
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-dev
 
 # Extract version and create version file
@@ -35,6 +33,7 @@ ENV PYTHONUNBUFFERED=1
 
 COPY ./alembic.ini /app/alembic.ini
 COPY ./static /app/static
+COPY ./uvicorn_config.py /app/uvicorn_config.py
 
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
