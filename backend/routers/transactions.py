@@ -73,7 +73,7 @@ async def delete_transaction(
     await transaction_manager.delete_tx(transaction_id)
 
 
-@router.post("/transaction/{transaction_id}", response_model=Transaction)
+@router.post("/transaction/cancel/{transaction_id}", response_model=Transaction)
 async def mark_cancelled(
     transaction_id: str,
     transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)],
