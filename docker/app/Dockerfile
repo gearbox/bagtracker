@@ -38,9 +38,9 @@ COPY ./uvicorn_config.py /app/uvicorn_config.py
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
+COPY ./backend /app/backend
 # Copy version file (not pyproject.toml)
 COPY --from=builder /app/backend/_version.py /app/backend/
-COPY ./backend /app/backend
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []

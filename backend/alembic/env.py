@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy import create_engine
 
 from backend.databases.models import Base  # Import your SQLAlchemy models here
+from backend.security.encryption import EncryptedString
 from backend.settings import settings
 
 # this is the Alembic Config object, which provides
@@ -34,6 +35,18 @@ def get_db_url() -> str:
     return config.get_main_option("sqlalchemy.url") or settings.db_url
 
 
+def render_item(type_: str, obj: object, autogen_context):
+    """Apply custom rendering for selected items."""
+
+    if type_ == "type" and isinstance(obj, EncryptedString):
+        # add import for this type
+        autogen_context.imports.add("from backend.security.encryption import EncryptedString")
+        return f"EncryptedString(length={obj.length})"
+
+    # default rendering for other objects
+    return False
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -50,6 +63,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        render_item=render_item,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -73,7 +87,11 @@ def run_migrations_online() -> None:
     connectable = create_engine(get_db_url())
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_item=render_item,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
@@ -40,6 +41,8 @@ class WalletPatch(BaseModel):
 class Wallet(WalletBase):
     uuid: UUID
     created_at: datetime
+    last_sync_at: datetime | None = None
+    total_value_usd: Decimal
     chain: Chain | None = None
     # transactions: list[Transaction] = []
 

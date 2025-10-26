@@ -1,3 +1,4 @@
+from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
 
@@ -77,6 +78,18 @@ class Settings(BaseSettings):
     api_key_rotation_days: int = 90
     # Security settings END
 
+    # App settings
+    balance_dust_threshold: Decimal = Decimal("0.000001")
+    balance_snapshot_enabled: bool = True
+    balance_hourly_snapshots: bool = True
+    balance_daily_snapshots: bool = True
+    # Price update interval in seconds (default: 5 minutes).
+    balance_price_update_interval: int = 300
+    # Number of days to retain daily/weekly history.
+    balance_history_retention_days: int = 90
+    # Number of days to retain hourly snapshots.
+    balance_hourly_retention_days: int = 7
+
     # Override settings with OS ENV values
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -103,6 +116,29 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings():
+    """
+    Dependency function for FastAPI to inject settings.
+
+    Usage in route handlers:
+        @router.get("/example")
+        async def example(
+            settings: Annotated[Settings, Depends(get_settings)]
+        ):
+            return {"threshold": settings.balance_dust_threshold}
+
+    Usage in managers:
+        class MyManager(BaseCRUDManager[Model]):
+            def __init__(
+                self,
+                db,
+                settings: Annotated[Settings, Depends(get_settings)]
+            ):
+                super().__init__(db)
+                self.settings = settings
+
+    The @lru_cache decorator ensures Settings is only instantiated once
+    and reused across all requests (singleton pattern).
+    """
     return Settings()
 
 

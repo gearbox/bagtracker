@@ -1,8 +1,8 @@
 """init schema
 
-Revision ID: 3ed618a58194
+Revision ID: b0a45d5d7934
 Revises:
-Create Date: 2025-10-13 02:52:26.201068
+Create Date: 2025-10-26 00:19:22.472183
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "3ed618a58194"
+revision: str = "b0a45d5d7934"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -373,10 +373,7 @@ def upgrade() -> None:
         sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
         sa.Column("amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
-        sa.Column("unrealized_pnl_usd", sa.Numeric(precision=20, scale=4), nullable=True),
-        sa.Column("unrealized_pnl_percent", sa.Numeric(precision=8, scale=4), nullable=True),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint("amount >= 0", name="non_negative_balance_raw"),
         sa.CheckConstraint("amount_decimal >= 0", name="non_negative_balance_decimal"),
@@ -422,10 +419,7 @@ def upgrade() -> None:
         sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
         sa.Column("amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
-        sa.Column("unrealized_pnl_usd", sa.Numeric(precision=20, scale=4), nullable=True),
-        sa.Column("unrealized_pnl_percent", sa.Numeric(precision=8, scale=4), nullable=True),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "snapshot_type IN ('transaction', 'hourly', 'daily', 'weekly', 'monthly')", name="valid_snapshot_type"
@@ -511,11 +505,11 @@ def upgrade() -> None:
         sa.Column("symbol", sa.String(length=50), nullable=True),
         sa.Column("nft_token_id", sa.String(length=100), nullable=False),
         sa.Column("token_standard", sa.String(length=20), nullable=False),
-        sa.Column("amount", sa.Integer(), nullable=False),
         sa.Column("token_url", sa.Text(), nullable=True),
         sa.Column("token_metadata", sa.JSON(), nullable=True),
         sa.Column("name", sa.String(length=20), nullable=True),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
+        sa.Column("amount", sa.Integer(), nullable=False),
+        sa.Column("price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("image_url", sa.Text(), nullable=True),
         sa.CheckConstraint("amount >= 0", name="positive_amount"),
         sa.ForeignKeyConstraint(["wallet_id"], ["wallets.id"], ondelete="CASCADE"),
@@ -555,11 +549,11 @@ def upgrade() -> None:
         sa.Column("symbol", sa.String(length=50), nullable=True),
         sa.Column("nft_token_id", sa.String(length=100), nullable=False),
         sa.Column("token_standard", sa.String(length=20), nullable=False),
-        sa.Column("amount", sa.Integer(), nullable=False),
         sa.Column("token_url", sa.Text(), nullable=True),
         sa.Column("token_metadata", sa.JSON(), nullable=True),
         sa.Column("name", sa.String(length=20), nullable=True),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
+        sa.Column("amount", sa.Integer(), nullable=False),
+        sa.Column("price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("image_url", sa.Text(), nullable=True),
         sa.ForeignKeyConstraint(["wallet_id"], ["wallets.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("snapshot_date", "id"),
@@ -583,7 +577,6 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=10), nullable=False),
         sa.Column("counterparty_addr", sa.String(length=100), nullable=True),
         sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
         sa.Column("gas_used", sa.Integer(), nullable=True),
         sa.Column("gas_price", sa.Numeric(precision=20, scale=0), nullable=True),
@@ -613,7 +606,6 @@ def upgrade() -> None:
         sa.Column("created_by", sa.BigInteger(), nullable=True),
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.CheckConstraint("amount >= 0", name="check_amount_non_negative"),
-        sa.CheckConstraint("value_usd >= 0", name="check_value_non_negative"),
         sa.CheckConstraint("wallet_id IS NOT NULL OR cex_account_id IS NOT NULL", name="check_has_owner"),
         sa.ForeignKeyConstraint(["cex_account_id"], ["cex_accounts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="RESTRICT"),
@@ -671,10 +663,7 @@ def upgrade() -> None:
         sa.Column("total_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("locked_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
-        sa.Column("unrealized_pnl_usd", sa.Numeric(precision=20, scale=4), nullable=True),
-        sa.Column("unrealized_pnl_percent", sa.Numeric(precision=8, scale=4), nullable=True),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.Column("asset_type", sa.String(length=20), nullable=False),
         sa.Column("is_lending", sa.Boolean(), nullable=False),
@@ -720,10 +709,7 @@ def upgrade() -> None:
         sa.Column("total_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("locked_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
-        sa.Column("unrealized_pnl_usd", sa.Numeric(precision=20, scale=4), nullable=True),
-        sa.Column("unrealized_pnl_percent", sa.Numeric(precision=8, scale=4), nullable=True),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.Column("asset_type", sa.String(length=20), nullable=False),
         sa.Column("is_lending", sa.Boolean(), nullable=False),

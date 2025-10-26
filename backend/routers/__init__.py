@@ -13,17 +13,19 @@ from backend.routers import (
     tokens,
     rpcs,
     auth,
+    balance,
 )
 
 main_router = APIRouter(dependencies=common)
 main_router.include_router(healthcheck.router, tags=['Health check'])
 main_router.include_router(info.router, tags=['Info'], dependencies=token_auth)
 main_router.include_router(eth.router, tags=['Ethereum'])
+main_router.include_router(chains.router, tags=['Chains'])
+main_router.include_router(tokens.router, tags=['Tokens'])
+main_router.include_router(rpcs.router, tags=['RPCs'])
 main_router.include_router(auth.router, tags=['Auth'])
 main_router.include_router(users.router, tags=['Users'])
 main_router.include_router(wallets.router, tags=['Wallets'])
 main_router.include_router(transactions.router, tags=['Transactions'])
 main_router.include_router(portfolio.router, tags=['Portfolio'])
-main_router.include_router(chains.router, tags=['Chains'])
-main_router.include_router(tokens.router, tags=['Tokens'])
-main_router.include_router(rpcs.router, tags=['RPCs'])
+main_router.include_router(balance.router, tags=['Balance'])

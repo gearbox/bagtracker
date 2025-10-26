@@ -50,7 +50,6 @@ class Transaction(Base):
         nullable=False,
         default=0,
     )  # token balance, store as integer
-    value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
     price_usd: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=8), nullable=True)
 
     # Gas/fees
@@ -71,7 +70,6 @@ class Transaction(Base):
 
     __table_args__ = (
         CheckConstraint("amount >= 0", name="check_amount_non_negative"),
-        CheckConstraint("value_usd >= 0", name="check_value_non_negative"),
         CheckConstraint("wallet_id IS NOT NULL OR cex_account_id IS NOT NULL", name="check_has_owner"),
         Index("uq_tx_hash_chain", "transaction_hash", "chain_id", unique=True),
         # Performance indexes
@@ -100,16 +98,9 @@ class BalanceBase:
         Numeric(38, 18), nullable=False, default=0
     )  # Human-readable balance
     price_usd: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=8), nullable=True)
-    value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
     avg_price_usd: Mapped[Decimal] = mapped_column(
         Numeric(precision=20, scale=4), nullable=False, default=0
     )  # average purchase price
-    unrealized_pnl_usd: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=20, scale=4), nullable=True
-    )  # Unrealized P&L
-    unrealized_pnl_percent: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=8, scale=4), nullable=True
-    )  # P&L percentage
     last_price_update: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -149,8 +140,6 @@ class Balance(Base, BalanceBase):
         base_schema = super().to_schema(include_id)
         if self.amount_decimal:
             base_schema["amount_display"] = f"{self.amount_decimal} {self.token.symbol}"
-        if self.value_usd:
-            base_schema["value_usd_display"] = f"${self.value_usd:,.2f}"
         return base_schema
 
 
@@ -187,11 +176,11 @@ class NFTBalanceBase:
     symbol: Mapped[str | None] = mapped_column(String(50), nullable=True)
     nft_token_id: Mapped[str] = mapped_column(String(100), nullable=False)
     token_standard: Mapped[str] = mapped_column(String(20), nullable=False, default="ERC721")  # ERC721, ERC1155, etc.
-    amount: Mapped[str] = mapped_column(Integer, nullable=False, default=1)  # For ERC1155
     token_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     token_metadata: Mapped[str | None] = mapped_column(JSON, nullable=True)  # store JSON metadata
     name: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    amount: Mapped[str] = mapped_column(Integer, nullable=False, default=1)  # For ERC1155
+    price_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -204,12 +193,6 @@ class NFTBalance(Base, NFTBalanceBase):
         UniqueConstraint("wallet_id", "contract_address", name="uq_nft_wallet_token"),
         CheckConstraint("amount >= 0", name="positive_amount"),
     )
-
-    def to_schema(self, include_id: bool = False) -> dict:
-        base_schema = super().to_schema(include_id)
-        if self.value_usd:
-            base_schema["value_usd_display"] = f"${self.value_usd:,.2f}"
-        return base_schema
 
 
 class NFTBalanceHistory(Base, NFTBalanceBase):
@@ -247,16 +230,10 @@ class CexBalanceBase:
     total_balance: Mapped[Decimal] = mapped_column(Numeric(38, 18), nullable=False, default=0)
     locked_balance: Mapped[Decimal] = mapped_column(Numeric(38, 18), nullable=False, default=0)
     price_usd: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=8), nullable=True)
-    value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
+    # value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
     avg_price_usd: Mapped[Decimal] = mapped_column(
         Numeric(precision=20, scale=4), nullable=False, default=0
     )  # average purchase price
-    unrealized_pnl_usd: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=20, scale=4), nullable=True
-    )  # Unrealized P&L
-    unrealized_pnl_percent: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=8, scale=4), nullable=True
-    )  # P&L percentage
     last_price_update: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Asset classification
@@ -303,8 +280,6 @@ class CexBalance(Base, CexBalanceBase):
         base_schema = super().to_schema(include_id)
         if self.amount_decimal:
             base_schema["amount_display"] = f"{self.amount_decimal} {self.token.symbol}"
-        if self.value_usd:
-            base_schema["value_usd_display"] = f"${self.value_usd:,.2f}"
         return base_schema
 
 

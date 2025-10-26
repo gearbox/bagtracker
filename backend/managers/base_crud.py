@@ -15,6 +15,7 @@ from backend import schemas
 from backend.databases import get_async_db_session
 from backend.databases.models import Base, User
 from backend.errors import BadRequestException, DatabaseError
+from backend.settings import Settings, get_settings
 from backend.validators import get_uuid, get_uuid_or_rise
 
 T = TypeVar("T", bound=Base)
@@ -30,8 +31,13 @@ class BaseCRUDManager(ABC, Generic[T]):
     # Override in subclasses to specify relationships to eager load
     eager_load: list[str] | None = None
 
-    def __init__(self, db: Annotated[AsyncSession, Depends(get_async_db_session)]) -> None:
+    def __init__(
+        self,
+        db: Annotated[AsyncSession, Depends(get_async_db_session)],
+        settings: Annotated[Settings, Depends(get_settings)],
+    ) -> None:
         self.db = db
+        self.settings = settings
         self.model = self._model_class
         if not self.model:
             raise NotImplementedError("Subclasses must define a model.")
@@ -59,8 +65,6 @@ class BaseCRUDManager(ABC, Generic[T]):
             stmt: the SQLAlchemy statement with eager loading
         """
         if eager_load := eager_load or self.eager_load:
-            logger.debug("Apply eager loading")
-
             for relationship_path in eager_load:
                 # Split by dot to support nested relationships
                 parts = relationship_path.split(".")

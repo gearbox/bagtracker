@@ -30,9 +30,7 @@ class TransactionBase(BaseModel):
     transaction_type: TransactionType = TransactionType.BUY
     status: TransactionStatus = TransactionStatus.CONFIRMED
     counterparty_addr: str | None = None
-    # symbol: str
     amount: Decimal = Decimal("0.00")
-    value_usd: Decimal = Decimal("0.00")
     price_usd: Decimal = Decimal("0.00")
 
     gas_used: int | None = 0
@@ -62,9 +60,7 @@ class TransactionPatch(BaseModel):
     transaction_type: TransactionType = TransactionType.BUY
     status: TransactionStatus = TransactionStatus.CONFIRMED
     counterparty_addr: str | None = None
-    # symbol: str
     amount: Decimal = Decimal("0.00")
-    value_usd: Decimal = Decimal("0.00")
     price_usd: Decimal = Decimal("0.00")
 
     gas_used: int | None = 0

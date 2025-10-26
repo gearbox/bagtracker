@@ -1,6 +1,6 @@
 [project]
 name = "bagtracker"
-version = "0.0.8"
+version = "0.0.10"
 description = "Bag Tracker. Track Your Bags. Embrace the Rekt."
 authors = ["Mihail Tayrov <mtayrov@gmail.com>"]
 readme = "README.md"
@@ -64,7 +64,7 @@ quote-style = "double"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "SIM", "UP"]
-ignore = ["UP046"]
+ignore = ["UP046", "B008"]
 
 [dependency-groups]
 dev = [
