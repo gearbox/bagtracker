@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.databases.models import Balance, BalanceHistory, Transaction
+from backend.errors import TransactionError
 from backend.schemas import BalanceCalculatedTotals, SnapshotType, TransactionStatus, TransactionType
 from backend.settings import Settings
 
@@ -25,8 +26,9 @@ class BalanceCalculator:
     - Atomicity: All balance updates happen in a single DB transaction
 
     Note: This is a service class instantiated by managers, not a FastAPI dependency.
-    Managers handle dependency injection and pass db/settings to this service.
     """
+
+    qtz_default = Decimal("1.0000")
 
     def __init__(self, db: AsyncSession, settings: Settings):
         """
@@ -51,6 +53,7 @@ class BalanceCalculator:
         Returns:
             Updated Balance object
         """
+        # TODO: move _get_or_create_balance to the TransactionManager/BalanceManager
         # Get or create balance record
         balance = await self._get_or_create_balance(transaction)
 
@@ -88,10 +91,9 @@ class BalanceCalculator:
                 wallet_id=transaction.wallet_id,
                 chain_id=transaction.chain_id,
                 token_id=transaction.token_id,
-                amount=Decimal(0),  # Raw amount as Decimal (Numeric(38, 0))
-                amount_decimal=Decimal(0),  # Human-readable with decimals
-                # value_usd=Decimal(0),
-                avg_price_usd=Decimal(0),
+                amount=Decimal(0),
+                amount_decimal=Decimal(0),
+                avg_buy_price_usd=Decimal(0),
                 price_usd=transaction.price_usd,
                 last_price_update=transaction.timestamp,
             )
@@ -125,69 +127,68 @@ class BalanceCalculator:
 
         # Update current price and value
         balance.price_usd = tx_price
-        # balance.value_usd = balance.amount_decimal * tx_price
         balance.last_price_update = transaction.timestamp
         balance.last_updated_at = datetime.now(UTC)
 
-        # # Calculate unrealized P&L
-        # if balance.amount_decimal > 0 and balance.avg_price_usd > 0:
-        #     balance.unrealized_pnl_usd = (tx_price - balance.avg_price_usd) * balance.amount_decimal
-        #     balance.unrealized_pnl_percent = ((tx_price - balance.avg_price_usd) / balance.avg_price_usd) * 100
-        # else:
-        #     balance.unrealized_pnl_usd = Decimal(0)
-        #     balance.unrealized_pnl_percent = Decimal(0)
-
         return balance
 
-    async def _process_acquisition(self, balance: Balance, amount: Decimal, price: Decimal) -> None:
+    async def _process_acquisition(self, balance: Balance, amount: Decimal, buy_price: Decimal) -> None:
         """
         Processes BUY or TRANSFER_IN using FIFO method.
-        Updates average cost basis.
+        Updates average buy price using weighted average.
         """
         # Convert raw amount to decimal (divide by 10^decimals)
-        # Assuming amount is already in decimal form from transaction
         amount_decimal = amount
 
-        # Calculate new average price using weighted average
-        current_value = balance.amount_decimal * balance.avg_price_usd
-        new_value = amount_decimal * price
-        total_amount = balance.amount_decimal + amount_decimal
+        current_value = balance.total_bought_decimal * balance.avg_buy_price_usd
+        new_value = amount_decimal * buy_price
+        total_bought = balance.total_bought_decimal + amount_decimal
 
-        if total_amount > 0:
-            balance.avg_price_usd = (current_value + new_value) / total_amount
+        if total_bought > 0:
+            balance.avg_buy_price_usd = (current_value + new_value) / total_bought
         else:
-            balance.avg_price_usd = price
+            balance.avg_buy_price_usd = buy_price
 
-        # Update balance
+        # Update totals
+        balance.total_bought_decimal += amount_decimal
         balance.amount_decimal += amount_decimal
-        # Store raw amount as Decimal (matches Numeric(38, 0) in DB)
         balance.amount += amount
 
-    async def _process_disposal(self, balance: Balance, amount: Decimal, price: Decimal) -> None:
+    async def _process_disposal(self, balance: Balance, amount: Decimal, sell_price: Decimal) -> None:
         """
         Processes SELL or TRANSFER_OUT.
-        Validates sufficient balance and realizes P&L.
+        Updates average sell price and realizes P&L.
         """
         amount_decimal = amount
 
         # Validate sufficient balance
         if balance.amount_decimal < amount_decimal:
-            raise ValueError(f"Insufficient balance: have {balance.amount_decimal}, trying to dispose {amount_decimal}")
+            raise TransactionError(
+                400,
+                f"Insufficient balance: have {balance.amount_decimal.quantize(self.qtz_default)}, "
+                f"trying to dispose {amount_decimal}",
+            )
 
-        # TODO: Add `realized_pnl` field to the Balance model
-        # Calculate realized P&L (optional: store separately)
-        # realized_pnl = (price - balance.avg_price_usd) * amount_decimal
+        # Update average sell price using weighted average
+        current_sell_value = balance.total_sold_decimal * balance.avg_sell_price_usd
+        new_sell_value = amount_decimal * sell_price
+        total_sold = balance.total_sold_decimal + amount_decimal
 
-        # Update balance (avg_price_usd stays the same with FIFO)
+        if total_sold > 0:
+            balance.avg_sell_price_usd = (current_sell_value + new_sell_value) / total_sold
+        else:
+            balance.avg_sell_price_usd = sell_price
+
+        # Update totals
+        balance.total_sold_decimal += amount_decimal
         balance.amount_decimal -= amount_decimal
-        # Store raw amount as Decimal (matches Numeric(38, 0) in DB)
         balance.amount -= amount
 
-        # If balance reaches dust threshold, reset to zero
+        # If balance reaches dust threshold, reset
         if balance.amount_decimal <= self._dust_threshold:
             balance.amount_decimal = Decimal(0)
             balance.amount = Decimal(0)
-            balance.avg_price_usd = Decimal(0)
+            # Keep historical averages for reference
 
     async def _create_history_snapshot(
         self, balance: Balance, snapshot_type: SnapshotType, triggered_by: str | None = None
@@ -207,10 +208,7 @@ class BalanceCalculator:
             amount=balance.amount,
             amount_decimal=balance.amount_decimal,
             price_usd=balance.price_usd,
-            # value_usd=balance.value_usd,
-            avg_price_usd=balance.avg_price_usd,
-            # unrealized_pnl_usd=balance.unrealized_pnl_usd,
-            # unrealized_pnl_percent=balance.unrealized_pnl_percent,
+            avg_buy_price_usd=balance.avg_buy_price_usd,
             last_price_update=balance.last_price_update,
             snapshot_date=datetime.now(UTC),
             snapshot_type=snapshot_type.value,  # Convert enum to string for DB
@@ -267,10 +265,10 @@ class BalanceCalculator:
         # Reset balance to zero before recalculation
         balance.amount = Decimal(0)  # Raw amount as Decimal
         balance.amount_decimal = Decimal(0)
-        balance.avg_price_usd = Decimal(0)
-        # balance.value_usd = Decimal(0)
-        # balance.unrealized_pnl_usd = Decimal(0)
-        # balance.unrealized_pnl_percent = Decimal(0)
+        balance.avg_buy_price_usd = Decimal(0)
+        balance.avg_sell_price_usd = Decimal(0)
+        balance.total_bought_decimal = Decimal(0)
+        balance.total_sold_decimal = Decimal(0)
 
         # Replay all transactions
         for tx in transactions:
@@ -282,28 +280,35 @@ class BalanceCalculator:
         if isinstance(balance, Balance):
             balance_price_usd = balance.price_usd or Decimal(0)
             balance_amount_decimal = balance.amount_decimal or Decimal(0)
-            balance_avg_price_usd = balance.avg_price_usd or Decimal(0)
+            balance_avg_buy_price_usd = balance.avg_buy_price_usd or Decimal(0)
+            balance_avg_sell_price_usd = balance.avg_sell_price_usd or Decimal(0)
+            balance_total_sold_decimal = balance.total_sold_decimal or Decimal(0)
         else:
             balance_price_usd = balance["price_usd"] or Decimal(0)
             balance_amount_decimal = balance["amount_decimal"] or Decimal(0)
-            balance_avg_price_usd = balance["avg_price_usd"] or Decimal(0)
+            balance_avg_buy_price_usd = balance["avg_buy_price_usd"] or Decimal(0)
+            balance_avg_sell_price_usd = balance["avg_sell_price_usd"] or Decimal(0)
+            balance_total_sold_decimal = balance.get("total_sold_decimal") or Decimal(0)
 
         balance_value_usd = balance_amount_decimal * balance_price_usd
-        realized_pnl_usd = ((balance_price_usd - balance_avg_price_usd) * balance_amount_decimal).quantize(
-            Decimal("1.0000")
+
+        realized_pnl_usd = (
+            (balance_avg_sell_price_usd - balance_avg_buy_price_usd) * balance_total_sold_decimal
+            if balance_total_sold_decimal > 0
+            else Decimal(0)
         )
+        unrealized_pnl_usd = (balance_price_usd - balance_avg_buy_price_usd) * balance_amount_decimal
         unrealized_pnl_percent = (
-            ((balance_price_usd - balance_avg_price_usd) / balance_avg_price_usd) * 100
-            if balance_avg_price_usd
+            ((balance_price_usd - balance_avg_buy_price_usd) / balance_avg_buy_price_usd) * 100
+            if balance_avg_buy_price_usd
             else Decimal(0)
         )
         return BalanceCalculatedTotals(
-            total_value_usd_display=f"${balance_value_usd:,.2f}",
-            total_value_usd=balance_value_usd.quantize(Decimal("1.0000")),
-            # TODO: realized_pnl_usd and unrealized_pnl_usd are equal (have same calculation formula)
-            total_realized_pnl_usd=realized_pnl_usd,
-            total_unrealized_pnl_usd=realized_pnl_usd,
-            total_unrealized_pnl_percent=unrealized_pnl_percent,
+            total_value_usd_display=f"${balance_value_usd.quantize(self.qtz_default):,.2f}",
+            total_value_usd=balance_value_usd.quantize(self.qtz_default),
+            total_realized_pnl_usd=realized_pnl_usd.quantize(self.qtz_default),
+            total_unrealized_pnl_usd=unrealized_pnl_usd.quantize(self.qtz_default),
+            total_unrealized_pnl_percent=unrealized_pnl_percent.quantize(self.qtz_default),
         )
 
     async def calculate_from_balance_many(self, balances: list[Balance | dict]) -> list[BalanceCalculatedTotals]:

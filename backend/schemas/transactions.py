@@ -29,7 +29,7 @@ class TransactionBase(BaseModel):
     transaction_index: int | None = None
     transaction_type: TransactionType = TransactionType.BUY
     status: TransactionStatus = TransactionStatus.CONFIRMED
-    counterparty_addr: str | None = None
+    counterparty_address: str | None = None
     amount: Decimal = Decimal("0.00")
     price_usd: Decimal = Decimal("0.00")
 
@@ -59,7 +59,7 @@ class TransactionPatch(BaseModel):
     transaction_index: int | None = None
     transaction_type: TransactionType = TransactionType.BUY
     status: TransactionStatus = TransactionStatus.CONFIRMED
-    counterparty_addr: str | None = None
+    counterparty_address: str | None = None
     amount: Decimal = Decimal("0.00")
     price_usd: Decimal = Decimal("0.00")
 

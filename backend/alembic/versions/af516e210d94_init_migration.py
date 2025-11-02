@@ -1,8 +1,8 @@
-"""init schema
+"""init migration
 
-Revision ID: b0a45d5d7934
+Revision ID: af516e210d94
 Revises:
-Create Date: 2025-10-26 00:19:22.472183
+Create Date: 2025-11-02 17:55:44.909627
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "b0a45d5d7934"
+revision: str = "af516e210d94"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -339,11 +339,23 @@ def upgrade() -> None:
     op.create_index(op.f("ix_wallets_uuid"), "wallets", ["uuid"], unique=False)
     op.create_table(
         "balances",
-        sa.Column("previous_balance_decimal", sa.Numeric(precision=38, scale=18), nullable=True),
-        sa.Column("balance_change_24h", sa.Numeric(precision=38, scale=18), nullable=True),
-        sa.Column("balance_change_percent_24h", sa.Numeric(precision=8, scale=4), nullable=True),
+        sa.Column(
+            "previous_balance_decimal",
+            sa.Numeric(precision=38, scale=18),
+            nullable=True,
+            comment="Previous balance for change tracking",
+        ),
+        sa.Column(
+            "balance_change_24h", sa.Numeric(precision=38, scale=18), nullable=True, comment="24h balance change"
+        ),
+        sa.Column(
+            "balance_change_percent_24h",
+            sa.Numeric(precision=8, scale=4),
+            nullable=True,
+            comment="24h percentage change",
+        ),
         sa.Column("last_updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("last_sync_block", sa.Integer(), nullable=True),
+        sa.Column("last_sync_block", sa.Integer(), nullable=True, comment="Last synced block number"),
         sa.Column("sync_status", sa.String(length=20), nullable=False),
         sa.Column("all_time_high_usd", sa.Numeric(precision=20, scale=4), nullable=True),
         sa.Column("all_time_high_date", sa.DateTime(timezone=True), nullable=True),
@@ -370,10 +382,28 @@ def upgrade() -> None:
         sa.Column("wallet_id", sa.BigInteger(), nullable=False),
         sa.Column("chain_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
-        sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
-        sa.Column("amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False),
+        sa.Column(
+            "amount", sa.Numeric(precision=38, scale=0), nullable=False, comment="Raw token balance, store as integer"
+        ),
+        sa.Column(
+            "amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Human-readable balance"
+        ),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
+        sa.Column(
+            "avg_buy_price_usd", sa.Numeric(precision=20, scale=4), nullable=False, comment="Weighted average buy price"
+        ),
+        sa.Column(
+            "avg_sell_price_usd",
+            sa.Numeric(precision=20, scale=4),
+            nullable=False,
+            comment="Weighted average sell price",
+        ),
+        sa.Column(
+            "total_bought_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount bought"
+        ),
+        sa.Column(
+            "total_sold_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount sold"
+        ),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint("amount >= 0", name="non_negative_balance_raw"),
         sa.CheckConstraint("amount_decimal >= 0", name="non_negative_balance_decimal"),
@@ -416,10 +446,28 @@ def upgrade() -> None:
         sa.Column("wallet_id", sa.BigInteger(), nullable=False),
         sa.Column("chain_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
-        sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
-        sa.Column("amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False),
+        sa.Column(
+            "amount", sa.Numeric(precision=38, scale=0), nullable=False, comment="Raw token balance, store as integer"
+        ),
+        sa.Column(
+            "amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Human-readable balance"
+        ),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
+        sa.Column(
+            "avg_buy_price_usd", sa.Numeric(precision=20, scale=4), nullable=False, comment="Weighted average buy price"
+        ),
+        sa.Column(
+            "avg_sell_price_usd",
+            sa.Numeric(precision=20, scale=4),
+            nullable=False,
+            comment="Weighted average sell price",
+        ),
+        sa.Column(
+            "total_bought_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount bought"
+        ),
+        sa.Column(
+            "total_sold_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount sold"
+        ),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "snapshot_type IN ('transaction', 'hourly', 'daily', 'weekly', 'monthly')", name="valid_snapshot_type"
@@ -506,7 +554,7 @@ def upgrade() -> None:
         sa.Column("nft_token_id", sa.String(length=100), nullable=False),
         sa.Column("token_standard", sa.String(length=20), nullable=False),
         sa.Column("token_url", sa.Text(), nullable=True),
-        sa.Column("token_metadata", sa.JSON(), nullable=True),
+        sa.Column("token_metadata", sa.JSON(), nullable=True, comment="Store JSON metadata"),
         sa.Column("name", sa.String(length=20), nullable=True),
         sa.Column("amount", sa.Integer(), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
@@ -550,7 +598,7 @@ def upgrade() -> None:
         sa.Column("nft_token_id", sa.String(length=100), nullable=False),
         sa.Column("token_standard", sa.String(length=20), nullable=False),
         sa.Column("token_url", sa.Text(), nullable=True),
-        sa.Column("token_metadata", sa.JSON(), nullable=True),
+        sa.Column("token_metadata", sa.JSON(), nullable=True, comment="Store JSON metadata"),
         sa.Column("name", sa.String(length=20), nullable=True),
         sa.Column("amount", sa.Integer(), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
@@ -572,11 +620,13 @@ def upgrade() -> None:
         sa.Column("token_id", sa.BigInteger(), nullable=False),
         sa.Column("transaction_hash", sa.String(length=100), nullable=True),
         sa.Column("block_number", sa.BigInteger(), nullable=True),
-        sa.Column("transaction_index", sa.Integer(), nullable=True),
+        sa.Column("transaction_index", sa.Integer(), nullable=True, comment="Transaction index in block"),
         sa.Column("transaction_type", sa.String(length=20), nullable=False),
         sa.Column("status", sa.String(length=10), nullable=False),
-        sa.Column("counterparty_addr", sa.String(length=100), nullable=True),
-        sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
+        sa.Column("counterparty_address", sa.String(length=100), nullable=True),
+        sa.Column(
+            "amount", sa.Numeric(precision=38, scale=0), nullable=False, comment="Token balance, store as integer"
+        ),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
         sa.Column("gas_used", sa.Integer(), nullable=True),
         sa.Column("gas_price", sa.Numeric(precision=20, scale=0), nullable=True),
@@ -627,11 +677,25 @@ def upgrade() -> None:
     op.create_index("uq_tx_hash_chain", "transactions", ["transaction_hash", "chain_id"], unique=True)
     op.create_table(
         "cex_balances",
-        sa.Column("previous_balance_decimal", sa.Numeric(precision=38, scale=18), nullable=True),
-        sa.Column("balance_change_24h", sa.Numeric(precision=38, scale=18), nullable=True),
-        sa.Column("balance_change_percent_24h", sa.Numeric(precision=8, scale=4), nullable=True),
+        sa.Column(
+            "previous_balance_decimal",
+            sa.Numeric(precision=38, scale=18),
+            nullable=True,
+            comment="Previous balance for change tracking",
+        ),
+        sa.Column(
+            "balance_change_24h", sa.Numeric(precision=38, scale=18), nullable=True, comment="24h balance change"
+        ),
+        sa.Column(
+            "balance_change_percent_24h",
+            sa.Numeric(precision=8, scale=4),
+            nullable=True,
+            comment="24h percentage change",
+        ),
         sa.Column("total_interest_earned", sa.Numeric(precision=38, scale=18), nullable=True),
-        sa.Column("interest_rate_apy", sa.Numeric(precision=8, scale=4), nullable=True),
+        sa.Column(
+            "interest_rate_apy", sa.Numeric(precision=8, scale=4), nullable=True, comment="Annual percentage yield"
+        ),
         sa.Column("last_updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("sync_status", sa.String(length=20), nullable=False),
         sa.Column("all_time_high_usd", sa.Numeric(precision=20, scale=4), nullable=True),
@@ -658,12 +722,30 @@ def upgrade() -> None:
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("subaccount_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
-        sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
-        sa.Column("amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False),
+        sa.Column(
+            "amount", sa.Numeric(precision=38, scale=0), nullable=False, comment="Raw token balance, store as integer"
+        ),
+        sa.Column(
+            "amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Human-readable balance"
+        ),
         sa.Column("total_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("locked_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
+        sa.Column(
+            "avg_buy_price_usd", sa.Numeric(precision=20, scale=4), nullable=False, comment="Weighted average buy price"
+        ),
+        sa.Column(
+            "avg_sell_price_usd",
+            sa.Numeric(precision=20, scale=4),
+            nullable=False,
+            comment="Weighted average sell price",
+        ),
+        sa.Column(
+            "total_bought_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount bought"
+        ),
+        sa.Column(
+            "total_sold_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount sold"
+        ),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.Column("asset_type", sa.String(length=20), nullable=False),
         sa.Column("is_lending", sa.Boolean(), nullable=False),
@@ -704,12 +786,30 @@ def upgrade() -> None:
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
         sa.Column("subaccount_id", sa.BigInteger(), nullable=False),
         sa.Column("token_id", sa.BigInteger(), nullable=False),
-        sa.Column("amount", sa.Numeric(precision=38, scale=0), nullable=False),
-        sa.Column("amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False),
+        sa.Column(
+            "amount", sa.Numeric(precision=38, scale=0), nullable=False, comment="Raw token balance, store as integer"
+        ),
+        sa.Column(
+            "amount_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Human-readable balance"
+        ),
         sa.Column("total_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("locked_balance", sa.Numeric(precision=38, scale=18), nullable=False),
         sa.Column("price_usd", sa.Numeric(precision=20, scale=8), nullable=True),
-        sa.Column("avg_price_usd", sa.Numeric(precision=20, scale=4), nullable=False),
+        sa.Column(
+            "avg_buy_price_usd", sa.Numeric(precision=20, scale=4), nullable=False, comment="Weighted average buy price"
+        ),
+        sa.Column(
+            "avg_sell_price_usd",
+            sa.Numeric(precision=20, scale=4),
+            nullable=False,
+            comment="Weighted average sell price",
+        ),
+        sa.Column(
+            "total_bought_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount bought"
+        ),
+        sa.Column(
+            "total_sold_decimal", sa.Numeric(precision=38, scale=18), nullable=False, comment="Total amount sold"
+        ),
         sa.Column("last_price_update", sa.DateTime(timezone=True), nullable=True),
         sa.Column("asset_type", sa.String(length=20), nullable=False),
         sa.Column("is_lending", sa.Boolean(), nullable=False),

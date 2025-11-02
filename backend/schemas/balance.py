@@ -24,7 +24,10 @@ class BalanceBase(BaseModel):
     token_id: int
     # TODO: We lack `amount` field, which we have in the db model. Do we need it?
     amount_decimal: Decimal
-    avg_price_usd: Decimal
+    avg_buy_price_usd: Decimal
+    avg_sell_price_usd: Decimal
+    total_bought_decimal: Decimal
+    total_sold_decimal: Decimal
     price_usd: Decimal | None = None
     last_price_update: datetime | None = None
 

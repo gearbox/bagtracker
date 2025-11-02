@@ -65,7 +65,17 @@ class BalanceManager(BaseCRUDManager[Balance]):
         stmt = select(
             func.sum(self.model.amount_decimal).label("amount_decimal"),
             func.sum(self.model.price_usd).label("price_usd"),
-            func.sum(self.model.avg_price_usd).label("avg_price_usd"),
+            # Weighted averages for buy/sell prices
+            (
+                func.sum(self.model.avg_buy_price_usd * self.model.total_bought_decimal)
+                / func.nullif(func.sum(self.model.total_bought_decimal), 0)
+            ).label("avg_buy_price_usd"),
+            (
+                func.sum(self.model.avg_sell_price_usd * self.model.total_sold_decimal)
+                / func.nullif(func.sum(self.model.total_sold_decimal), 0)
+            ).label("avg_sell_price_usd"),
+            func.sum(self.model.total_bought_decimal).label("total_bought_decimal"),
+            func.sum(self.model.total_sold_decimal).label("total_sold_decimal"),
             func.count(self.model.id).label("token_count"),
         ).filter(
             self.model.wallet_id == wallet_id,
@@ -81,8 +91,6 @@ class BalanceManager(BaseCRUDManager[Balance]):
         total_balance._assign_attributes(row._asdict())
 
         totals = await calculator.calculate_from_balance(total_balance)
-
-        # totals = await calculator.calculate_from_values(row._asdict())
 
         return {
             **totals.model_dump(),
@@ -169,7 +177,6 @@ class BalanceManager(BaseCRUDManager[Balance]):
 
             recalculated_balances.append(balance)
 
-        logger.debug(f"{recalculated_balances=}")
         # Update wallet total
         await self._update_wallet_total(wallet_id)
 

@@ -11,7 +11,7 @@ class PostgresDatabase(BaseDatabase):
     def init_db(self) -> None:
         logger.debug("Initializing Postgres database...")
         try:
-            # self.engine = create_engine(self.db_url)
+            # TODO: Move pool settings to settings.py (and ENV)
             self.engine = create_engine(
                 self.db_url,
                 poolclass=QueuePool,

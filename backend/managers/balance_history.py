@@ -88,7 +88,16 @@ class BalanceHistoryManager(BaseCRUDManager[BalanceHistory]):
                 self.model.snapshot_date,
                 func.sum(self.model.amount_decimal).label("amount_decimal"),
                 func.sum(self.model.price_usd).label("price_usd"),
-                func.sum(self.model.avg_price_usd).label("avg_price_usd"),
+                (
+                    func.sum(self.model.avg_buy_price_usd * self.model.total_bought_decimal)
+                    / func.nullif(func.sum(self.model.total_bought_decimal), 0)
+                ).label("avg_buy_price_usd"),
+                (
+                    func.sum(self.model.avg_sell_price_usd * self.model.total_sold_decimal)
+                    / func.nullif(func.sum(self.model.total_sold_decimal), 0)
+                ).label("avg_sell_price_usd"),
+                func.sum(self.model.total_bought_decimal).label("total_bought_decimal"),
+                func.sum(self.model.total_sold_decimal).label("total_sold_decimal"),
             )
             .filter(
                 self.model.wallet_id == wallet_id,

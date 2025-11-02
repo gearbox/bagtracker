@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # Redis
     redis_host: str | None = None
     redis_port: int = 6379
+    redis_db: int = 0
 
     # Logging
     default_log_format: str = "[{time:%Y-%m-%d %H:%M:%S:%f %z}] - {name} - <level>{level}</level> - {message}"

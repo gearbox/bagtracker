@@ -39,17 +39,18 @@ class Transaction(Base):
 
     transaction_hash: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     block_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    transaction_index: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Transaction index in block
+    transaction_index: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="Transaction index in block")
     transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(10), nullable=False)  # pending, confirmed, failed
-    counterparty_addr: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. counterparty address
+    counterparty_address: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Amount/price
     amount: Mapped[Decimal] = mapped_column(
         Numeric(38, 0),
         nullable=False,
         default=0,
-    )  # token balance, store as integer
+        comment="Token balance, store as integer",
+    )
     price_usd: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=8), nullable=True)
 
     # Gas/fees
@@ -92,15 +93,24 @@ class BalanceBase:
     )
 
     amount: Mapped[Decimal] = mapped_column(
-        Numeric(38, 0), nullable=False, default=0
-    )  # raw token balance, store as integer
+        Numeric(38, 0), nullable=False, default=0, comment="Raw token balance, store as integer"
+    )
     amount_decimal: Mapped[Decimal] = mapped_column(
-        Numeric(38, 18), nullable=False, default=0
-    )  # Human-readable balance
+        Numeric(38, 18), nullable=False, default=0, comment="Human-readable balance"
+    )
     price_usd: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=8), nullable=True)
-    avg_price_usd: Mapped[Decimal] = mapped_column(
-        Numeric(precision=20, scale=4), nullable=False, default=0
-    )  # average purchase price
+    avg_buy_price_usd: Mapped[Decimal] = mapped_column(
+        Numeric(precision=20, scale=4), nullable=False, default=0, comment="Weighted average buy price"
+    )
+    avg_sell_price_usd: Mapped[Decimal] = mapped_column(
+        Numeric(precision=20, scale=4), nullable=False, default=0, comment="Weighted average sell price"
+    )
+    total_bought_decimal: Mapped[Decimal] = mapped_column(
+        Numeric(38, 18), nullable=False, default=0, comment="Total amount bought"
+    )
+    total_sold_decimal: Mapped[Decimal] = mapped_column(
+        Numeric(38, 18), nullable=False, default=0, comment="Total amount sold"
+    )
     last_price_update: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -108,18 +118,20 @@ class Balance(Base, BalanceBase):
     __tablename__ = "balances"
 
     previous_balance_decimal: Mapped[Decimal | None] = mapped_column(
-        Numeric(38, 18), nullable=True
-    )  # Previous balance for change tracking
-    balance_change_24h: Mapped[Decimal | None] = mapped_column(Numeric(38, 18), nullable=True)  # 24h balance change
+        Numeric(38, 18), nullable=True, comment="Previous balance for change tracking"
+    )
+    balance_change_24h: Mapped[Decimal | None] = mapped_column(
+        Numeric(38, 18), nullable=True, comment="24h balance change"
+    )
     balance_change_percent_24h: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 4), nullable=True
-    )  # 24h percentage change
+        Numeric(8, 4), nullable=True, comment="24h percentage change"
+    )
 
     # Sync tracking
     last_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    last_sync_block: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Last synced block number
+    last_sync_block: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="Last synced block number")
     sync_status: Mapped[str] = mapped_column(String(20), nullable=False, default="synced")  # synced, syncing, error
 
     # Performance tracking
@@ -177,7 +189,7 @@ class NFTBalanceBase:
     nft_token_id: Mapped[str] = mapped_column(String(100), nullable=False)
     token_standard: Mapped[str] = mapped_column(String(20), nullable=False, default="ERC721")  # ERC721, ERC1155, etc.
     token_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    token_metadata: Mapped[str | None] = mapped_column(JSON, nullable=True)  # store JSON metadata
+    token_metadata: Mapped[str | None] = mapped_column(JSON, nullable=True, comment="Store JSON metadata")
     name: Mapped[str | None] = mapped_column(String(20), nullable=True)
     amount: Mapped[str] = mapped_column(Integer, nullable=False, default=1)  # For ERC1155
     price_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
@@ -222,18 +234,26 @@ class CexBalanceBase:
 
     # Balance details
     amount: Mapped[Decimal] = mapped_column(
-        Numeric(38, 0), nullable=False, default=0
-    )  # raw token balance, store as integer
+        Numeric(38, 0), nullable=False, default=0, comment="Raw token balance, store as integer"
+    )
     amount_decimal: Mapped[Decimal] = mapped_column(
-        Numeric(38, 18), nullable=False, default=0
-    )  # Human-readable balance
+        Numeric(38, 18), nullable=False, default=0, comment="Human-readable balance"
+    )
     total_balance: Mapped[Decimal] = mapped_column(Numeric(38, 18), nullable=False, default=0)
     locked_balance: Mapped[Decimal] = mapped_column(Numeric(38, 18), nullable=False, default=0)
     price_usd: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=8), nullable=True)
-    # value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
-    avg_price_usd: Mapped[Decimal] = mapped_column(
-        Numeric(precision=20, scale=4), nullable=False, default=0
-    )  # average purchase price
+    avg_buy_price_usd: Mapped[Decimal] = mapped_column(
+        Numeric(precision=20, scale=4), nullable=False, default=0, comment="Weighted average buy price"
+    )
+    avg_sell_price_usd: Mapped[Decimal] = mapped_column(
+        Numeric(precision=20, scale=4), nullable=False, default=0, comment="Weighted average sell price"
+    )
+    total_bought_decimal: Mapped[Decimal] = mapped_column(
+        Numeric(38, 18), nullable=False, default=0, comment="Total amount bought"
+    )
+    total_sold_decimal: Mapped[Decimal] = mapped_column(
+        Numeric(38, 18), nullable=False, default=0, comment="Total amount sold"
+    )
     last_price_update: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Asset classification
@@ -246,16 +266,20 @@ class CexBalance(Base, CexBalanceBase):
     __tablename__ = "cex_balances"
 
     previous_balance_decimal: Mapped[Decimal | None] = mapped_column(
-        Numeric(38, 18), nullable=True
-    )  # Previous balance for change tracking
-    balance_change_24h: Mapped[Decimal | None] = mapped_column(Numeric(38, 18), nullable=True)  # 24h balance change
+        Numeric(38, 18), nullable=True, comment="Previous balance for change tracking"
+    )
+    balance_change_24h: Mapped[Decimal | None] = mapped_column(
+        Numeric(38, 18), nullable=True, comment="24h balance change"
+    )
     balance_change_percent_24h: Mapped[Decimal | None] = mapped_column(
-        Numeric(8, 4), nullable=True
-    )  # 24h percentage change
+        Numeric(8, 4), nullable=True, comment="24h percentage change"
+    )
 
     # Interest/yield tracking
     total_interest_earned: Mapped[Decimal | None] = mapped_column(Numeric(38, 18), nullable=True, default=0)
-    interest_rate_apy: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)  # Annual percentage yield
+    interest_rate_apy: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 4), nullable=True, comment="Annual percentage yield"
+    )
 
     # Sync tracking
     last_updated_at: Mapped[datetime] = mapped_column(

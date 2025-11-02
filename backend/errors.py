@@ -98,3 +98,13 @@ class WalletError(GeneralProcessingException):
 
     def __init__(self, status_code: int | None = None, exception_message: str | None = None):
         super().__init__(status_code=status_code, exception_message=exception_message)
+
+
+class TransactionError(GeneralProcessingException):
+    """Transaction-related exception class"""
+
+    message = "Transaction cannot be processed"
+    status_code = 400
+
+    def __init__(self, status_code: int | None = None, exception_message: str | None = None):
+        super().__init__(status_code=status_code, exception_message=exception_message)
