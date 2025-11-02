@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from loguru import logger
-from sqlalchemy import func, select
+from sqlalchemy import func, not_, select
 
 from backend.databases.models import Balance, Transaction, Wallet
 from backend.managers import BaseCRUDManager
@@ -151,7 +151,11 @@ class BalanceManager(BaseCRUDManager[Balance]):
         # Get all unique token/chain combinations for this wallet
         stmt = (
             select(Transaction.token_id, Transaction.chain_id)
-            .filter(Transaction.wallet_id == wallet_id, Transaction.status == TransactionStatus.CONFIRMED.value)
+            .filter(
+                Transaction.wallet_id == wallet_id,
+                Transaction.status == TransactionStatus.CONFIRMED.value,
+                not_(Transaction.is_deleted),
+            )
             .distinct()
         )
 

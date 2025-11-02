@@ -69,8 +69,9 @@ async def patch_transaction(
 async def delete_transaction(
     transaction_id: str,
     transaction_manager: Annotated[TransactionManager, Depends(TransactionManager)],
+    recalculate_balance: bool = False,
 ) -> None:
-    await transaction_manager.delete_tx(transaction_id)
+    await transaction_manager.delete_tx(transaction_id, recalculate_balance)
 
 
 @router.post("/transaction/cancel/{transaction_id}", response_model=Transaction)

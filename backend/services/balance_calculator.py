@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.databases.models import Balance, BalanceHistory, Transaction
@@ -234,11 +234,12 @@ class BalanceCalculator:
         # Get all confirmed transactions ordered by timestamp
         stmt = (
             select(Transaction)
-            .where(
+            .filter(
                 Transaction.wallet_id == wallet_id,
                 Transaction.token_id == token_id,
                 Transaction.chain_id == chain_id,
                 Transaction.status == TransactionStatus.CONFIRMED.value,
+                not_(Transaction.is_deleted),
             )
             .order_by(Transaction.timestamp.asc())
         )
@@ -272,6 +273,7 @@ class BalanceCalculator:
 
         # Replay all transactions
         for tx in transactions:
+            logger.debug(f"Try to apply transaction {tx.to_dict()}")
             await self._apply_transaction(balance, tx)
 
         return balance
