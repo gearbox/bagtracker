@@ -9,7 +9,7 @@ from fastapi import Depends
 from loguru import logger
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, with_loader_criteria
+from sqlalchemy.orm import selectinload
 
 from backend import schemas
 from backend.databases import get_async_db_session
@@ -77,15 +77,10 @@ class BaseCRUDManager(ABC, Generic[T]):
 
                 # Build the chain of selectinload
                 rel_attr = getattr(current_model, parts[0])
+                related_model = rel_attr.property.mapper.class_
                 loader = selectinload(rel_attr)
 
-                # Apply is_deleted filter using with_loader_criteria
-                if not include_deleted:
-                    related_model = rel_attr.property.mapper.class_
-                    if hasattr(related_model, "is_deleted"):
-                        stmt = stmt.options(with_loader_criteria(related_model, related_model.is_deleted == False))  # noqa: E712
-
-                current_model = rel_attr.property.mapper.class_
+                current_model = related_model
 
                 # Chain additional levels
                 for part in parts[1:]:
@@ -94,15 +89,12 @@ class BaseCRUDManager(ABC, Generic[T]):
                         break
 
                     rel_attr = getattr(current_model, part)
+                    related_model = rel_attr.property.mapper.class_
+
+                    # Chain the nested loader
                     loader = loader.selectinload(rel_attr)
 
-                    # Apply is_deleted filter using with_loader_criteria
-                    if not include_deleted:
-                        related_model = rel_attr.property.mapper.class_
-                        if hasattr(related_model, "is_deleted"):
-                            stmt = stmt.options(with_loader_criteria(related_model, related_model.is_deleted == False))  # noqa: E712
-
-                    current_model = rel_attr.property.mapper.class_
+                    current_model = related_model
 
                 stmt = stmt.options(loader)
         return stmt
@@ -118,7 +110,7 @@ class BaseCRUDManager(ABC, Generic[T]):
         """
         stmt = select(self.model).filter_by(**kwargs)
         if not include_deleted:
-            stmt = stmt.filter(self.model.is_deleted == False)  # noqa: E712
+            stmt = stmt.filter(self.model.is_deleted.is_(False))
         return stmt
 
     async def _error_if_exists(self, obj_id: str | int) -> None:
@@ -173,7 +165,7 @@ class BaseCRUDManager(ABC, Generic[T]):
     async def get_one(self, include_deleted: bool = False, eager_load: list[str] | bool | None = None, **kwargs) -> T:
         try:
             stmt = self._get_by_kwargs(include_deleted, **kwargs)
-            if eager_load in {None, True}:
+            if eager_load in (None, True):
                 eager_load = []
             if isinstance(eager_load, list):
                 stmt = self._apply_eager_loading(stmt, include_deleted, eager_load)

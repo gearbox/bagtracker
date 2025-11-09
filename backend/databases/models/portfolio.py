@@ -68,41 +68,6 @@ class Portfolio(Base):
         return base_schema
 
 
-class Wallet(Base):
-    __tablename__ = "wallets"
-
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    chain_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("chains.id", ondelete="RESTRICT"), nullable=False, index=True
-    )
-    portfolio_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
-    )
-
-    name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # optional user-defined name
-    wallet_type: Mapped[str] = mapped_column(String(20), nullable=False)  # metamask, ledger, tronlink
-    address: Mapped[str] = mapped_column(Text, nullable=False, index=True, unique=True)
-    sync_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
-    is_watched_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
-    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
-
-    owner = relationship("User", back_populates="wallets")
-    chain = relationship("Chain", back_populates="wallets")
-    portfolio = relationship("Portfolio", back_populates="wallets")
-    transactions = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan")
-    balances = relationship("Balance", back_populates="wallet", cascade="all, delete-orphan")
-    balances_history = relationship("BalanceHistory", back_populates="wallet", cascade="all, delete-orphan")
-    nft_balances = relationship("NFTBalance", back_populates="wallet", cascade="all, delete-orphan")
-    nft_balances_history = relationship("NFTBalanceHistory", back_populates="wallet", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        UniqueConstraint("address", "chain_id", name="uq_wallet_address_chain"),
-        Index("ix_wallets_user_chain", "user_id", "chain_id"),
-        Index("ix_wallets_portfolio", "portfolio_id"),
-    )
-
-
 class Exchange(Base):
     """Centralized exchanges supported, e.g. Bybit, Binance, BingX, HTX, etc."""
 
@@ -130,7 +95,7 @@ class CexAccount(Base):
         BigInteger, ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
 
-    name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # optional user-defined name
+    name: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="User-defined name")
     # For API keys, etc
     api_key: Mapped[str | None] = mapped_column(EncryptedString(500), nullable=True)
     api_secret: Mapped[str | None] = mapped_column(EncryptedString(500), nullable=True)
@@ -154,7 +119,7 @@ class CexSubAccount(Base):
     account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cex_accounts.id"), nullable=False)
 
     subaccount_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. "spot", "funding", "earn"
-    subaccount_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Exchange-specific name/ID
+    subaccount_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="Exchange-specific name/ID")
     total_value_usd: Mapped[Decimal] = mapped_column(Numeric(precision=20, scale=4), nullable=False, default=0)
 
     account = relationship("CexAccount", back_populates="subaccounts")

@@ -11,9 +11,7 @@ from backend.validators import get_uuid_or_rise
 class UserManager(BaseCRUDManager):
     # Define relationships to eager load
     eager_load = [
-        "wallets",
-        "wallets.chain",
-        "portfolios",
+        "wallets.addresses.chain",
         "portfolios.wallets",
         "cex_accounts",
     ]

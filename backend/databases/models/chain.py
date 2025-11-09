@@ -139,7 +139,7 @@ class Chain(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     tokens = relationship("Token", back_populates="chain")
-    wallets = relationship("Wallet", back_populates="chain")
+    wallet_addresses = relationship("WalletAddress", back_populates="chain", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="chain")
     balances = relationship("Balance", back_populates="chain")
     balances_history = relationship("BalanceHistory", back_populates="chain")

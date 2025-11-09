@@ -1,8 +1,8 @@
 """init migration
 
-Revision ID: af516e210d94
+Revision ID: b1423ae03e75
 Revises:
-Create Date: 2025-11-02 17:55:44.909627
+Create Date: 2025-11-09 16:44:05.671201
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "af516e210d94"
+revision: str = "b1423ae03e75"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -258,7 +258,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("exchange_id", sa.BigInteger(), nullable=False),
         sa.Column("portfolio_id", sa.BigInteger(), nullable=True),
-        sa.Column("name", sa.String(length=50), nullable=True),
+        sa.Column("name", sa.String(length=50), nullable=True, comment="User-defined name"),
         sa.Column("api_key", EncryptedString(length=500), nullable=True),
         sa.Column("api_secret", EncryptedString(length=500), nullable=True),
         sa.Column("passphrase", EncryptedString(length=500), nullable=True),
@@ -296,11 +296,9 @@ def upgrade() -> None:
     op.create_table(
         "wallets",
         sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("chain_id", sa.BigInteger(), nullable=False),
         sa.Column("portfolio_id", sa.BigInteger(), nullable=True),
         sa.Column("name", sa.String(length=50), nullable=True),
         sa.Column("wallet_type", sa.String(length=20), nullable=False),
-        sa.Column("address", sa.Text(), nullable=False),
         sa.Column("sync_enabled", sa.Boolean(), server_default="true", nullable=False),
         sa.Column("is_watched_only", sa.Boolean(), server_default="false", nullable=False),
         sa.Column("last_sync_at", sa.DateTime(timezone=True), nullable=True),
@@ -325,17 +323,12 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("created_by", sa.BigInteger(), nullable=True),
         sa.Column("updated_by", sa.BigInteger(), nullable=True),
-        sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["portfolio_id"], ["portfolios.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("address", "chain_id", name="uq_wallet_address_chain"),
     )
-    op.create_index(op.f("ix_wallets_address"), "wallets", ["address"], unique=True)
-    op.create_index(op.f("ix_wallets_chain_id"), "wallets", ["chain_id"], unique=False)
     op.create_index(op.f("ix_wallets_created_at"), "wallets", ["created_at"], unique=False)
     op.create_index("ix_wallets_portfolio", "wallets", ["portfolio_id"], unique=False)
-    op.create_index("ix_wallets_user_chain", "wallets", ["user_id", "chain_id"], unique=False)
     op.create_index(op.f("ix_wallets_uuid"), "wallets", ["uuid"], unique=False)
     op.create_table(
         "balances",
@@ -494,7 +487,7 @@ def upgrade() -> None:
         "cex_subaccounts",
         sa.Column("account_id", sa.BigInteger(), nullable=False),
         sa.Column("subaccount_type", sa.String(length=50), nullable=False),
-        sa.Column("subaccount_name", sa.String(length=100), nullable=True),
+        sa.Column("subaccount_name", sa.String(length=100), nullable=True, comment="Exchange-specific name/ID"),
         sa.Column("total_value_usd", sa.Numeric(precision=20, scale=4), nullable=False),
         sa.Column(
             "id",
@@ -676,6 +669,56 @@ def upgrade() -> None:
     op.create_index(op.f("ix_transactions_wallet_id"), "transactions", ["wallet_id"], unique=False)
     op.create_index("uq_tx_hash_chain", "transactions", ["transaction_hash", "chain_id"], unique=True)
     op.create_table(
+        "wallet_addresses",
+        sa.Column("wallet_id", sa.BigInteger(), nullable=False),
+        sa.Column("chain_id", sa.BigInteger(), nullable=False),
+        sa.Column("address", sa.Text(), nullable=False),
+        sa.Column("address_lowercase", sa.Text(), nullable=False),
+        sa.Column(
+            "derivation_path",
+            sa.String(length=100),
+            nullable=True,
+            comment="BIP44 derivation path, e.g., m/44'/60'/0'/0/0",
+        ),
+        sa.Column("last_sync_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("last_sync_block", sa.BigInteger(), nullable=True, comment="Last synced block number for this chain"),
+        sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "id",
+            sa.BigInteger(),
+            autoincrement=True,
+            nullable=False,
+            comment="Internal primary key for database operations",
+        ),
+        sa.Column(
+            "uuid",
+            sa.UUID(),
+            server_default=sa.text("gen_random_uuid()"),
+            nullable=False,
+            comment="External identifier for API and frontend",
+        ),
+        sa.Column("memo", sa.Text(), nullable=True),
+        sa.Column("is_deleted", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("created_by", sa.BigInteger(), nullable=True),
+        sa.Column("updated_by", sa.BigInteger(), nullable=True),
+        sa.ForeignKeyConstraint(["chain_id"], ["chains.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["wallet_id"], ["wallets.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("address_lowercase", "chain_id", name="uq_address_chain"),
+        sa.UniqueConstraint("wallet_id", "chain_id", name="uq_wallet_chain"),
+    )
+    op.create_index("ix_wallet_addr_chain_active", "wallet_addresses", ["chain_id", "is_active"], unique=False)
+    op.create_index("ix_wallet_addr_wallet_chain", "wallet_addresses", ["wallet_id", "chain_id"], unique=False)
+    op.create_index(
+        op.f("ix_wallet_addresses_address_lowercase"), "wallet_addresses", ["address_lowercase"], unique=False
+    )
+    op.create_index(op.f("ix_wallet_addresses_chain_id"), "wallet_addresses", ["chain_id"], unique=False)
+    op.create_index(op.f("ix_wallet_addresses_is_active"), "wallet_addresses", ["is_active"], unique=False)
+    op.create_index(op.f("ix_wallet_addresses_uuid"), "wallet_addresses", ["uuid"], unique=False)
+    op.create_index(op.f("ix_wallet_addresses_wallet_id"), "wallet_addresses", ["wallet_id"], unique=False)
+    op.create_table(
         "cex_balances",
         sa.Column(
             "previous_balance_decimal",
@@ -850,6 +893,14 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_cex_balances_uuid"), table_name="cex_balances")
     op.drop_index(op.f("ix_cex_balances_created_at"), table_name="cex_balances")
     op.drop_table("cex_balances")
+    op.drop_index(op.f("ix_wallet_addresses_wallet_id"), table_name="wallet_addresses")
+    op.drop_index(op.f("ix_wallet_addresses_uuid"), table_name="wallet_addresses")
+    op.drop_index(op.f("ix_wallet_addresses_is_active"), table_name="wallet_addresses")
+    op.drop_index(op.f("ix_wallet_addresses_chain_id"), table_name="wallet_addresses")
+    op.drop_index(op.f("ix_wallet_addresses_address_lowercase"), table_name="wallet_addresses")
+    op.drop_index("ix_wallet_addr_wallet_chain", table_name="wallet_addresses")
+    op.drop_index("ix_wallet_addr_chain_active", table_name="wallet_addresses")
+    op.drop_table("wallet_addresses")
     op.drop_index("uq_tx_hash_chain", table_name="transactions")
     op.drop_index(op.f("ix_transactions_wallet_id"), table_name="transactions")
     op.drop_index(op.f("ix_transactions_uuid"), table_name="transactions")
@@ -891,11 +942,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_balances_chain_id"), table_name="balances")
     op.drop_table("balances")
     op.drop_index(op.f("ix_wallets_uuid"), table_name="wallets")
-    op.drop_index("ix_wallets_user_chain", table_name="wallets")
     op.drop_index("ix_wallets_portfolio", table_name="wallets")
     op.drop_index(op.f("ix_wallets_created_at"), table_name="wallets")
-    op.drop_index(op.f("ix_wallets_chain_id"), table_name="wallets")
-    op.drop_index(op.f("ix_wallets_address"), table_name="wallets")
     op.drop_table("wallets")
     op.drop_index(op.f("ix_cex_accounts_uuid"), table_name="cex_accounts")
     op.drop_index(op.f("ix_cex_accounts_created_at"), table_name="cex_accounts")

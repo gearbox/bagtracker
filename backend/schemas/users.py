@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator, model_validator
 
 from backend.errors import UserError
-from backend.schemas import Portfolio, Wallet
+from backend.schemas import Portfolio, WalletResponse
 from backend.validators import is_uuid
 
 
@@ -27,6 +27,7 @@ class UserSignUp(BaseModel):
     name: str | None = None
     last_name: str | None = None
     nickname: str | None = None
+    memo: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -97,7 +98,7 @@ class UserNew(UserBase):
 
 
 class User(UserNew):
-    wallets: list[Wallet] = []
+    wallets: list[WalletResponse] = []
     portfolios: list[Portfolio] = []
     # cex_accounts: list = []
 

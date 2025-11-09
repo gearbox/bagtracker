@@ -17,7 +17,6 @@ from backend.errors import DatabaseError, UnexpectedException
 T = TypeVar("T", bound="Base")
 
 
-# Custom JSON encoder for handling Decimal and other types
 class DecimalEncoder(json.JSONEncoder):
     """
     JSON encoder that handles Decimal, datetime, and UUID types
@@ -48,7 +47,6 @@ class Base(DeclarativeBase):
 
     __abstract__ = True
 
-    # Primary key - BigInteger for performance
     id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True, comment="Internal primary key for database operations"
     )
@@ -60,9 +58,8 @@ class Base(DeclarativeBase):
         server_default=func.gen_random_uuid(),
         index=True,
         comment="External identifier for API and frontend",
-    )  # For API lookups
+    )
 
-    # Common fields
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)  # optional user-defined memo/description
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
@@ -192,7 +189,7 @@ class Base(DeclarativeBase):
         """
         stmt = select(cls).filter_by(**kwargs)
         if not include_deleted:
-            stmt = stmt.filter(cls.is_deleted == False)  # noqa: E712
+            stmt = stmt.filter(cls.is_deleted.is_(False))
         result = await session.execute(stmt)
         try:
             return result.scalar_one()
@@ -205,7 +202,7 @@ class Base(DeclarativeBase):
     ) -> list[T]:
         stmt = select(cls).filter_by(**kwargs)
         if not include_deleted:
-            stmt = stmt.filter(cls.is_deleted == False)  # noqa: E712
+            stmt = stmt.filter(cls.is_deleted.is_(False))
         if eager_load:
             for relationship in eager_load:
                 stmt = stmt.options(selectinload(relationship))

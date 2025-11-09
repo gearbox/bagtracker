@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from backend.schemas import Wallet
+from backend.schemas import WalletResponse
 
 
 class PortfolioBase(BaseModel):
@@ -16,7 +16,7 @@ class PortfolioBase(BaseModel):
 class Portfolio(PortfolioBase):
     uuid: UUID
     created_at: datetime
-    wallets: list[Wallet] = []
+    wallets: list[WalletResponse] = []
 
 
 class PortfolioCreateOrUpdate(PortfolioBase):

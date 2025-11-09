@@ -5,6 +5,7 @@ from uuid import UUID
 
 from loguru import logger
 from sqlalchemy import func, not_, select
+from sqlalchemy.orm import selectinload
 
 from backend.databases.models import Balance, Transaction, Wallet
 from backend.managers import BaseCRUDManager
@@ -55,6 +56,22 @@ class BalanceManager(BaseCRUDManager[Balance]):
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
+    async def get_wallet_balances_by_chain(
+        self, wallet_id: int, chain_id: int, include_zero: bool = False
+    ) -> list[Balance]:
+        """Get balances for a wallet on a specific chain."""
+        stmt = (
+            select(Balance)
+            .where(Balance.wallet_id == wallet_id, Balance.chain_id == chain_id)
+            .options(selectinload(Balance.token), selectinload(Balance.chain))
+        )
+
+        if not include_zero:
+            stmt = stmt.where(Balance.amount_decimal > 0)
+
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_wallet_total_value(self, wallet_id: int) -> dict:
         """
         Calculates total portfolio value for a wallet.
@@ -77,7 +94,7 @@ class BalanceManager(BaseCRUDManager[Balance]):
             func.sum(self.model.total_bought_decimal).label("total_bought_decimal"),
             func.sum(self.model.total_sold_decimal).label("total_sold_decimal"),
             func.count(self.model.id).label("token_count"),
-        ).filter(
+        ).where(
             self.model.wallet_id == wallet_id,
             self.model.amount_decimal > 0,
         )
@@ -96,6 +113,24 @@ class BalanceManager(BaseCRUDManager[Balance]):
             **totals.model_dump(),
             "token_count": row.token_count or 0,
         }
+
+    async def get_wallet_total_by_chain(self, wallet_id: int) -> dict[int, Decimal]:
+        """
+        Get total value per chain for a wallet.
+
+        Returns:
+            Dict mapping chain_id -> total_value_usd
+        """
+        from sqlalchemy import func
+
+        stmt = (
+            select(Balance.chain_id, func.sum(Balance.amount_decimal * Balance.price_usd).label("total_value_usd"))
+            .where(Balance.wallet_id == wallet_id, Balance.amount_decimal > 0)
+            .group_by(Balance.chain_id)
+        )
+
+        result = await self.db.execute(stmt)
+        return {row.chain_id: row.total_value_usd for row in result}
 
     async def process_transaction(self, transaction: Transaction, create_snapshot: bool = True) -> Balance:
         """
@@ -123,7 +158,7 @@ class BalanceManager(BaseCRUDManager[Balance]):
         totals = await self.get_wallet_total_value(wallet_id)
         logger.debug(f"{totals=}")
 
-        stmt = select(Wallet).filter(Wallet.id == wallet_id)
+        stmt = select(Wallet).where(Wallet.id == wallet_id)
         result = await self.db.execute(stmt)
         wallet = result.scalar_one()
 
@@ -151,7 +186,7 @@ class BalanceManager(BaseCRUDManager[Balance]):
         # Get all unique token/chain combinations for this wallet
         stmt = (
             select(Transaction.token_id, Transaction.chain_id)
-            .filter(
+            .where(
                 Transaction.wallet_id == wallet_id,
                 Transaction.status == TransactionStatus.CONFIRMED.value,
                 not_(Transaction.is_deleted),
@@ -208,7 +243,7 @@ class BalanceManager(BaseCRUDManager[Balance]):
         """
         calculator = BalanceCalculator(self.db, self.settings)
 
-        stmt = select(self.model).filter(self.model.token_id == token_id, self.model.amount_decimal > 0)
+        stmt = select(self.model).where(self.model.token_id == token_id, self.model.amount_decimal > 0)
 
         result = await self.db.execute(stmt)
         balances = result.scalars().all()
