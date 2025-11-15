@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+import os
 
 from sqlalchemy import (
     BigInteger,
@@ -21,6 +22,29 @@ from backend.databases.models import Base
 from backend.security.encryption import EncryptedString
 
 
+def _get_user_table_args():
+    """
+    Return table args based on environment.
+    In test/SQLite mode, skip PostgreSQL-specific constraints.
+    """
+    # Check if we're using SQLite (for tests) or PostgreSQL
+    is_sqlite = os.getenv("DB_DRIVER_ASYNC", "").startswith("sqlite")
+
+    if is_sqlite:
+        # SQLite-compatible constraints (no partial indexes or regex checks)
+        return (
+            Index("ix_users_username", "username", unique=True),
+            Index("ix_users_email", "email", unique=True),
+        )
+    else:
+        # PostgreSQL-specific constraints
+        return (
+            Index("ix_users_username_active", "username", unique=True, postgresql_where="is_deleted = false"),
+            Index("ix_users_email_active", "email", unique=True, postgresql_where="is_deleted = false"),
+            CheckConstraint(r"email ~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'", name="check_email_format_lower"),
+        )
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -36,11 +60,7 @@ class User(Base):
     portfolios = relationship("Portfolio", back_populates="owner", cascade="all, delete-orphan")
     cex_accounts = relationship("CexAccount", back_populates="owner", cascade="all, delete-orphan")
 
-    __table_args__ = (
-        Index("ix_users_username_active", "username", unique=True, postgresql_where="is_deleted = false"),
-        Index("ix_users_email_active", "email", unique=True, postgresql_where="is_deleted = false"),
-        CheckConstraint(r"email ~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'", name="check_email_format_lower"),
-    )
+    __table_args__ = _get_user_table_args()
 
     @validates("email")
     def validate_email(self, key, email):

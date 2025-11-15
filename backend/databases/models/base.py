@@ -55,7 +55,7 @@ class Base(DeclarativeBase):
     uuid: Mapped["uuid.UUID"] = mapped_column(
         UUID(as_uuid=True),
         nullable=False,
-        server_default=func.gen_random_uuid(),
+        default=uuid.uuid4,  # Use Python default instead of DB function for SQLite compatibility
         index=True,
         comment="External identifier for API and frontend",
     )

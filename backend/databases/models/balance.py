@@ -159,7 +159,7 @@ class BalanceHistory(Base, BalanceBase):
     __tablename__ = "balances_history"
 
     snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -211,7 +211,7 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
     __tablename__ = "nft_balances_history"
 
     snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -311,7 +311,7 @@ class CexBalanceHistory(Base, CexBalanceBase):
     __tablename__ = "cex_balances_history"
 
     snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
