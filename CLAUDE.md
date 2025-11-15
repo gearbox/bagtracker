@@ -1,6 +1,6 @@
 # CLAUDE.md - BagTracker AI Assistant Guide
 
-**Version:** 0.0.11
+**Version:** 0.0.12
 **Last Updated:** 2025-11-15
 **Project:** BagTracker - Cryptocurrency Portfolio Tracker
 
@@ -317,9 +317,17 @@ bagtracker/
 
 ### Database Technology
 - **Production**: PostgreSQL 14+ with asyncpg driver
+- **TimescaleDB**: Time-series extension for PostgreSQL (hypertables for balance history)
 - **ORM**: SQLAlchemy 2.0+ (async-first)
 - **Migrations**: Alembic with auto-generation
 - **Caching**: Redis for session storage and performance
+
+**IMPORTANT**: This project requires PostgreSQL with TimescaleDB extension. SQLite is **NOT** supported due to:
+- TimescaleDB hypertables with composite primary keys
+- PostgreSQL-specific functions (`gen_random_uuid()`)
+- PostgreSQL regex operators (`~` for CHECK constraints)
+- Partial indexes with `WHERE` clauses
+- `BIGINT PRIMARY KEY` with autoincrement in specific configurations
 
 ### Connection Management
 - **Pooling**: `AsyncAdaptedQueuePool` with configurable size
@@ -529,31 +537,47 @@ class Balance(Base):
 
 **FIFO Cost Basis**: Calculated by `BalanceCalculatorService` in `backend/services/balance_calculator.py`.
 
-#### BalanceHistory Model
+#### BalanceHistory Model (TimescaleDB Hypertable)
 ```python
-class BalanceHistory(Base):
-    __tablename__ = "balance_history"
+class BalanceHistory(Base, BalanceBase):
+    __tablename__ = "balances_history"
 
-    id = Column(BigInteger, primary_key=True)
-    uuid = Column(UUID(as_uuid=True), unique=True, default=uuid4)
+    # Composite primary key required for TimescaleDB hypertable
+    # snapshot_date MUST be first for time-series partitioning
+    snapshot_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
 
-    wallet_id = Column(BigInteger, ForeignKey("wallets.id", ondelete="CASCADE"))
-    token_id = Column(BigInteger, ForeignKey("tokens.id", ondelete="RESTRICT"))
-    chain_id = Column(BigInteger, ForeignKey("chains.id", ondelete="RESTRICT"))
+    snapshot_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="hourly"
+    )  # transaction, hourly, daily, weekly, monthly
 
-    snapshot_type = Column(String(20), nullable=False)
-    # transaction, hourly, daily, weekly, monthly
+    triggered_by: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # transaction, price_change, scheduled
 
-    snapshot_time = Column(DateTime(timezone=True), nullable=False, index=True)
+    # Relationships
+    token = relationship("Token", back_populates="balances_history")
+    wallet = relationship("Wallet", back_populates="balances_history")
+    chain = relationship("Chain", back_populates="balances_history")
 
-    amount_decimal = Column(Numeric(38, 18), nullable=False)
-    avg_buy_price_usd = Column(Numeric(38, 18))
-    value_usd = Column(Numeric(38, 18))
-
-    # Designed for TimescaleDB hypertable
+    __table_args__ = (
+        # CRITICAL: Composite primary key for TimescaleDB hypertable
+        # snapshot_date must be first for proper partitioning
+        PrimaryKeyConstraint("snapshot_date", "id"),
+        CheckConstraint(
+            "snapshot_type IN ('transaction', 'hourly', 'daily', 'weekly', 'monthly')",
+            name="valid_snapshot_type"
+        ),
+        Index("ix_balance_history_token_date", "token_id", "chain_id", "snapshot_date"),
+        Index("ix_balance_history_type_date", "snapshot_type", "snapshot_date"),
+        Index("ix_balance_history_wallet_date", "wallet_id", "snapshot_date"),
+    )
 ```
 
-**Time-Series Design**: Optimized for time-based queries, ready for TimescaleDB conversion.
+**TimescaleDB Hypertable**: This table is converted to a TimescaleDB hypertable partitioned by `snapshot_date`. The composite primary key `(snapshot_date, id)` is **required** for hypertable functionality. Inherits balance fields from `BalanceBase` mixin.
+
+**CRITICAL**: Do NOT change the primary key structure. SQLite cannot support this table structure.
 
 ### Database Conventions
 
@@ -594,6 +618,92 @@ class CexAccount(Base):
 ```
 
 **Encrypted Fields**: API keys, secrets, private keys (automatic encryption/decryption).
+
+### TimescaleDB Hypertables
+
+BagTracker uses TimescaleDB for efficient time-series data storage. Three tables are configured as hypertables:
+
+#### 1. BalanceHistory (`balances_history`)
+```python
+class BalanceHistory(Base, BalanceBase):
+    __tablename__ = "balances_history"
+
+    __table_args__ = (
+        PrimaryKeyConstraint("snapshot_date", "id"),  # Composite PK required
+        # ... other constraints
+    )
+```
+- **Partitioned by**: `snapshot_date`
+- **Purpose**: Track wallet balance changes over time
+- **Snapshot types**: transaction, hourly, daily, weekly, monthly
+- **Inherits from**: `BalanceBase` mixin (wallet_id, token_id, chain_id, amounts, prices)
+
+#### 2. NFTBalanceHistory (`nft_balances_history`)
+```python
+class NFTBalanceHistory(Base, NFTBalanceBase):
+    __tablename__ = "nft_balances_history"
+
+    __table_args__ = (
+        PrimaryKeyConstraint("snapshot_date", "id"),  # Composite PK required
+        # ... other constraints
+    )
+```
+- **Partitioned by**: `snapshot_date`
+- **Purpose**: Track NFT balance changes over time
+- **Inherits from**: `NFTBalanceBase` mixin (wallet_id, contract_address, nft_token_id, metadata)
+
+#### 3. CexBalanceHistory (`cex_balances_history`)
+```python
+class CexBalanceHistory(Base, CexBalanceBase):
+    __tablename__ = "cex_balances_history"
+
+    __table_args__ = (
+        PrimaryKeyConstraint("snapshot_date", "id"),  # Composite PK required
+        # ... other constraints
+    )
+```
+- **Partitioned by**: `snapshot_date`
+- **Purpose**: Track CEX (centralized exchange) balance changes over time
+- **Inherits from**: `CexBalanceBase` mixin (subaccount_id, token_id, amounts, prices, asset_type)
+
+#### Hypertable Creation
+
+Hypertables are created in the initial migration (`backend/alembic/versions/b1423ae03e75_init_migration.py`):
+
+```python
+def upgrade() -> None:
+    # ... create tables ...
+
+    # Convert to hypertables
+    op.execute("SELECT create_hypertable('balances_history', 'snapshot_date', if_not_exists => TRUE)")
+    op.execute("SELECT create_hypertable('nft_balances_history', 'snapshot_date', if_not_exists => TRUE)")
+    op.execute("SELECT create_hypertable('cex_balances_history', 'snapshot_date', if_not_exists => TRUE)")
+```
+
+#### Critical Requirements
+
+**⚠️ IMPORTANT: Composite Primary Key Order**
+
+All hypertable models MUST have a composite primary key with **`snapshot_date` FIRST**:
+```python
+PrimaryKeyConstraint("snapshot_date", "id")  # ✅ CORRECT
+PrimaryKeyConstraint("id", "snapshot_date")  # ❌ WRONG - breaks partitioning
+```
+
+The time-based column (`snapshot_date`) must be the first column in the composite primary key for TimescaleDB to properly partition the data.
+
+**Why Composite PKs?**
+- TimescaleDB hypertables require the partitioning column in the primary key
+- The `id` column provides uniqueness within each time partition
+- This allows efficient time-based queries while maintaining row uniqueness
+
+**SQLite Incompatibility**
+These tables **cannot** be used with SQLite because:
+- SQLite doesn't support TimescaleDB extensions
+- Composite primary keys with autoincrement columns have limitations
+- PostgreSQL-specific server defaults (`func.now()`, `func.gen_random_uuid()`)
+
+**Testing**: Always use PostgreSQL (preferably in a Docker container) for testing. Never attempt to run these models with SQLite.
 
 ### Migration Workflow
 
@@ -1774,6 +1884,8 @@ tests/
 
 ### Example Test (Recommended Pattern)
 
+**IMPORTANT**: Tests MUST use PostgreSQL, not SQLite. The project uses TimescaleDB hypertables and PostgreSQL-specific features.
+
 ```python
 # tests/conftest.py
 import pytest
@@ -1781,9 +1893,13 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from backend.databases.models.base import Base
 
+# Option 1: Use test PostgreSQL database
 @pytest.fixture
 async def async_session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    # Use PostgreSQL test database
+    TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5432/bagtracker_test"
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -1793,7 +1909,16 @@ async def async_session():
     async with async_session_maker() as session:
         yield session
 
+    # Cleanup: drop all tables after test
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
     await engine.dispose()
+
+# Option 2: Use Docker container for tests (recommended)
+# Start PostgreSQL container before running tests:
+# docker run -d -p 5433:5432 -e POSTGRES_PASSWORD=testpass -e POSTGRES_DB=bagtracker_test timescale/timescaledb:latest-pg14
+# Then use: postgresql+asyncpg://postgres:testpass@localhost:5433/bagtracker_test
 
 # tests/test_managers/test_user_manager.py
 import pytest
@@ -1811,14 +1936,23 @@ async def test_create_user(async_session):
     assert retrieved.username == "testuser"
 ```
 
+**Why PostgreSQL for Tests?**
+- TimescaleDB hypertables (BalanceHistory, NFTBalanceHistory, CexBalanceHistory) require PostgreSQL
+- PostgreSQL-specific functions: `gen_random_uuid()`, regex operators (`~`)
+- Partial indexes with `WHERE` clauses
+- Composite primary keys with autoincrement in hypertables
+
 ### Testing Best Practices
 
-1. **Use fixtures** for common setup (database, users, wallets)
-2. **Test isolation**: Each test should be independent
-3. **Mock external services**: Don't call real Web3 providers, price APIs
-4. **Test error cases**: Not just happy paths
-5. **Use factories**: Create test data with factories (factory_boy)
-6. **Async tests**: Mark with `@pytest.mark.asyncio`
+1. **Use PostgreSQL**: ALWAYS use PostgreSQL for tests, NEVER SQLite (see reasons above)
+2. **Use Docker**: Run PostgreSQL in Docker container for consistent test environment
+3. **Use fixtures** for common setup (database, users, wallets)
+4. **Test isolation**: Each test should be independent
+5. **Mock external services**: Don't call real Web3 providers, price APIs
+6. **Test error cases**: Not just happy paths
+7. **Use factories**: Create test data with factories (factory_boy)
+8. **Async tests**: Mark with `@pytest.mark.asyncio`
+9. **TimescaleDB**: If testing hypertable models, ensure TimescaleDB extension is enabled
 
 ---
 
@@ -2071,7 +2205,19 @@ COINGECKO_API_URL="https://api.coingecko.com/api/v3"
 
 ## Changelog
 
-### Version 0.0.11 (Current)
+### Version 0.0.12 (Current)
+- **BREAKING**: Documented TimescaleDB hypertable requirements
+- Added comprehensive TimescaleDB Hypertables section
+- Clarified composite primary key requirements for hypertables:
+  - BalanceHistory
+  - NFTBalanceHistory
+  - CexBalanceHistory
+- Emphasized PostgreSQL-only requirement (SQLite NOT supported)
+- Updated test examples to use PostgreSQL instead of SQLite
+- Updated Database Technology section with TimescaleDB details
+- Added warnings about composite PK ordering for hypertables
+
+### Version 0.0.11
 - Multi-chain wallet support
 - Transaction deletion fix
 - Balance and balance history calculation improvements
