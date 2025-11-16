@@ -7,10 +7,12 @@ This module defines Taskiq tasks for periodic operations:
 - Price updates with snapshots
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.databases.factory_async import get_async_db_instance
@@ -24,229 +26,99 @@ from backend.taskiq_broker import broker
 settings = get_settings()
 
 
-@broker.task(
-    schedule=[{"cron": "5 * * * *", "id": "hourly_balance_snapshots"}],
-)
-async def create_hourly_snapshots() -> dict:
+def _create_snapshot_task(
+    snapshot_type: SnapshotType,
+    schedule_name: str,  # e.g. "balance_hourly_snapshots"
+    cron: str,
+    triggered_by: str,  # e.g. "scheduled_hourly"
+    task_id: str,  # same id as broker.task
+) -> Callable[[], Any]:
     """
-    Create hourly balance snapshots for all active balances.
+    Factory function to create snapshot tasks.
 
-    This task runs every hour and creates snapshots of all non-zero balances.
-    Snapshots are stored in the balance_history TimescaleDB hypertable.
+    Args:
+        snapshot_type: Type of snapshot (HOURLY, DAILY, etc.)
+        schedule_name: Name of the settings attribute for this schedule
+        cron: Cron expression for scheduling
+        triggered_by: String identifier for the trigger
+        task_id: Unique task ID for the scheduler
 
     Returns:
-        Dict with task execution stats
+        Decorated task function
     """
-    if not settings.balance_snapshot_enabled or not settings.balance_hourly_snapshots:
-        logger.info("Hourly snapshots disabled in settings")
-        return {"status": "skipped", "reason": "disabled_in_settings"}
 
-    logger.info("Starting hourly balance snapshots task")
-    start_time = datetime.now(UTC)
+    @broker.task(schedule=[{"cron": cron, "id": task_id}])
+    async def _inner() -> dict:
+        if not settings.balance_snapshot_enabled or not getattr(settings, schedule_name):
+            logger.info(f"{snapshot_type.value.capitalize()} snapshots disabled")
+            return {"status": "skipped", "reason": "disabled_in_settings"}
 
-    try:
-        db = get_async_db_instance()
-        async with db.session() as session:
-            session: AsyncSession
-            calculator = BalanceCalculator(db=session, settings=settings)
+        logger.info(f"Starting {snapshot_type.value} balance snapshots task")
+        start = datetime.now(UTC)
+        try:
+            db = get_async_db_instance()
+            async with db.session() as session:
+                calculator = BalanceCalculator(db=session, settings=settings)
+                stmt = select(Balance).where(Balance.amount_decimal > 0)
+                result = await session.execute(stmt)
+                balances = result.scalars().all()
 
-            # Get all non-zero balances
-            stmt = select(Balance).where(Balance.amount_decimal > 0)
-            result = await session.execute(stmt)
-            balances = result.scalars().all()
+                for b in balances:
+                    await calculator._create_history_snapshot(
+                        balance=b,
+                        snapshot_type=snapshot_type,
+                        triggered_by=triggered_by,
+                    )
+                await session.commit()
 
-            snapshot_count = 0
-            for balance in balances:
-                await calculator._create_history_snapshot(
-                    balance=balance, snapshot_type=SnapshotType.HOURLY, triggered_by="scheduled_hourly"
-                )
-                snapshot_count += 1
-
-            # Commit all snapshots
-            await session.commit()
-
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.info(f"Hourly snapshots completed: {snapshot_count} snapshots in {duration:.2f}s")
-
+            duration = (datetime.now(UTC) - start).total_seconds()
+            logger.info(f"{snapshot_type.value.capitalize()} snapshots completed: {len(balances)} in {duration:.2f}s")
             return {
                 "status": "success",
-                "snapshot_type": "hourly",
-                "snapshots_created": snapshot_count,
+                "snapshot_type": snapshot_type.value,
+                "snapshots_created": len(balances),
                 "duration_seconds": duration,
             }
 
-    except Exception as e:
-        logger.error(f"Hourly snapshot task failed: {e}")
-        logger.exception(e)
-        return {"status": "error", "error": str(e)}
+        except Exception as e:
+            logger.error(f"{snapshot_type.value.capitalize()} snapshot task failed: {e}")
+            return {"status": "error", "error": str(e)}
+
+    return _inner
 
 
-@broker.task(
-    schedule=[{"cron": "15 0 * * *", "id": "daily_balance_snapshots"}],
+# Create snapshot tasks using the factory function
+create_hourly_snapshots = _create_snapshot_task(
+    snapshot_type=SnapshotType.HOURLY,
+    schedule_name="balance_hourly_snapshots",
+    cron="5 * * * *",
+    triggered_by="scheduled_hourly",
+    task_id="hourly_balance_snapshots",
 )
-async def create_daily_snapshots() -> dict:
-    """
-    Create daily balance snapshots for all active balances.
 
-    This task runs once per day and creates snapshots of all non-zero balances.
-
-    Returns:
-        Dict with task execution stats
-    """
-    if not settings.balance_snapshot_enabled or not settings.balance_daily_snapshots:
-        logger.info("Daily snapshots disabled in settings")
-        return {"status": "skipped", "reason": "disabled_in_settings"}
-
-    logger.info("Starting daily balance snapshots task")
-    start_time = datetime.now(UTC)
-
-    try:
-        db = get_async_db_instance()
-        async with db.session() as session:
-            session: AsyncSession
-            calculator = BalanceCalculator(db=session, settings=settings)
-
-            # Get all non-zero balances
-            stmt = select(Balance).where(Balance.amount_decimal > 0)
-            result = await session.execute(stmt)
-            balances = result.scalars().all()
-
-            snapshot_count = 0
-            for balance in balances:
-                await calculator._create_history_snapshot(
-                    balance=balance, snapshot_type=SnapshotType.DAILY, triggered_by="scheduled_daily"
-                )
-                snapshot_count += 1
-
-            # Commit all snapshots
-            await session.commit()
-
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.info(f"Daily snapshots completed: {snapshot_count} snapshots in {duration:.2f}s")
-
-            return {
-                "status": "success",
-                "snapshot_type": "daily",
-                "snapshots_created": snapshot_count,
-                "duration_seconds": duration,
-            }
-
-    except Exception as e:
-        logger.error(f"Daily snapshot task failed: {e}")
-        logger.exception(e)
-        return {"status": "error", "error": str(e)}
-
-
-@broker.task(
-    schedule=[{"cron": "0 1 * * 0", "id": "weekly_balance_snapshots"}],
+create_daily_snapshots = _create_snapshot_task(
+    snapshot_type=SnapshotType.DAILY,
+    schedule_name="balance_daily_snapshots",
+    cron="15 0 * * *",
+    triggered_by="scheduled_daily",
+    task_id="daily_balance_snapshots",
 )
-async def create_weekly_snapshots() -> dict:
-    """
-    Create weekly balance snapshots for all active balances.
 
-    This task runs once per week and creates snapshots of all non-zero balances.
-
-    Returns:
-        Dict with task execution stats
-    """
-    if not settings.balance_snapshot_enabled:
-        logger.info("Weekly snapshots disabled in settings")
-        return {"status": "skipped", "reason": "disabled_in_settings"}
-
-    logger.info("Starting weekly balance snapshots task")
-    start_time = datetime.now(UTC)
-
-    try:
-        db = get_async_db_instance()
-        async with db.session() as session:
-            session: AsyncSession
-            calculator = BalanceCalculator(db=session, settings=settings)
-
-            # Get all non-zero balances
-            stmt = select(Balance).where(Balance.amount_decimal > 0)
-            result = await session.execute(stmt)
-            balances = result.scalars().all()
-
-            snapshot_count = 0
-            for balance in balances:
-                await calculator._create_history_snapshot(
-                    balance=balance, snapshot_type=SnapshotType.WEEKLY, triggered_by="scheduled_weekly"
-                )
-                snapshot_count += 1
-
-            # Commit all snapshots
-            await session.commit()
-
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.info(f"Weekly snapshots completed: {snapshot_count} snapshots in {duration:.2f}s")
-
-            return {
-                "status": "success",
-                "snapshot_type": "weekly",
-                "snapshots_created": snapshot_count,
-                "duration_seconds": duration,
-            }
-
-    except Exception as e:
-        logger.error(f"Weekly snapshot task failed: {e}")
-        logger.exception(e)
-        return {"status": "error", "error": str(e)}
-
-
-@broker.task(
-    schedule=[{"cron": "0 2 1 * *", "id": "monthly_balance_snapshots"}],
+create_weekly_snapshots = _create_snapshot_task(
+    snapshot_type=SnapshotType.WEEKLY,
+    schedule_name="balance_snapshot_enabled",  # No specific weekly setting, use main flag
+    cron="0 1 * * 0",
+    triggered_by="scheduled_weekly",
+    task_id="weekly_balance_snapshots",
 )
-async def create_monthly_snapshots() -> dict:
-    """
-    Create monthly balance snapshots for all active balances.
 
-    This task runs once per month and creates snapshots of all non-zero balances.
-
-    Returns:
-        Dict with task execution stats
-    """
-    if not settings.balance_snapshot_enabled:
-        logger.info("Monthly snapshots disabled in settings")
-        return {"status": "skipped", "reason": "disabled_in_settings"}
-
-    logger.info("Starting monthly balance snapshots task")
-    start_time = datetime.now(UTC)
-
-    try:
-        db = get_async_db_instance()
-        async with db.session() as session:
-            session: AsyncSession
-            calculator = BalanceCalculator(db=session, settings=settings)
-
-            # Get all non-zero balances
-            stmt = select(Balance).where(Balance.amount_decimal > 0)
-            result = await session.execute(stmt)
-            balances = result.scalars().all()
-
-            snapshot_count = 0
-            for balance in balances:
-                await calculator._create_history_snapshot(
-                    balance=balance, snapshot_type=SnapshotType.MONTHLY, triggered_by="scheduled_monthly"
-                )
-                snapshot_count += 1
-
-            # Commit all snapshots
-            await session.commit()
-
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.info(f"Monthly snapshots completed: {snapshot_count} snapshots in {duration:.2f}s")
-
-            return {
-                "status": "success",
-                "snapshot_type": "monthly",
-                "snapshots_created": snapshot_count,
-                "duration_seconds": duration,
-            }
-
-    except Exception as e:
-        logger.error(f"Monthly snapshot task failed: {e}")
-        logger.exception(e)
-        return {"status": "error", "error": str(e)}
+create_monthly_snapshots = _create_snapshot_task(
+    snapshot_type=SnapshotType.MONTHLY,
+    schedule_name="balance_snapshot_enabled",  # No specific monthly setting, use main flag
+    cron="0 2 1 * *",
+    triggered_by="scheduled_monthly",
+    task_id="monthly_balance_snapshots",
+)
 
 
 @broker.task
@@ -388,34 +260,24 @@ async def cleanup_old_snapshots() -> dict:
 
             from backend.databases.models import BalanceHistory
 
-            # Cleanup hourly snapshots older than retention period
+            # Cleanup hourly snapshots older than retention period using bulk delete
             hourly_cutoff = datetime.now(UTC) - timedelta(days=settings.balance_hourly_retention_days)
-            stmt = select(BalanceHistory).where(
+            stmt = delete(BalanceHistory).where(
                 BalanceHistory.snapshot_type == SnapshotType.HOURLY.value, BalanceHistory.snapshot_date < hourly_cutoff
             )
             result = await session.execute(stmt)
-            hourly_to_delete = result.scalars().all()
+            hourly_deleted_count = getattr(result, "rowcount", 0) or 0
 
-            for snapshot in hourly_to_delete:
-                await session.delete(snapshot)
-
-            hourly_deleted_count = len(hourly_to_delete)
-
-            # Cleanup daily/weekly/monthly snapshots older than retention period
+            # Cleanup daily/weekly/monthly snapshots older than retention period using bulk delete
             history_cutoff = datetime.now(UTC) - timedelta(days=settings.balance_history_retention_days)
-            stmt = select(BalanceHistory).where(
+            stmt = delete(BalanceHistory).where(
                 BalanceHistory.snapshot_type.in_(
                     [SnapshotType.DAILY.value, SnapshotType.WEEKLY.value, SnapshotType.MONTHLY.value]
                 ),
                 BalanceHistory.snapshot_date < history_cutoff,
             )
             result = await session.execute(stmt)
-            history_to_delete = result.scalars().all()
-
-            for snapshot in history_to_delete:
-                await session.delete(snapshot)
-
-            history_deleted_count = len(history_to_delete)
+            history_deleted_count = getattr(result, "rowcount", 0) or 0
 
             # Commit deletions
             await session.commit()

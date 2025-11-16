@@ -1,6 +1,7 @@
 from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -55,6 +56,7 @@ class Settings(BaseSettings):
     redis_host: str | None = None
     redis_port: int = 6379
     redis_db: int = 0
+    redis_username: str | None = None
     redis_password: str | None = None
 
     # Taskiq
@@ -120,12 +122,25 @@ class Settings(BaseSettings):
 
     @property
     def redis_url(self) -> str:
-        """Redis URL for Taskiq broker"""
+        """Redis URL"""
         if self.taskiq_redis_url:
             return self.taskiq_redis_url
 
-        password_part = f":{self.redis_password}@" if self.redis_password else ""
-        return f"redis://{password_part}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        user = getattr(self, "redis_username", None)
+        password = getattr(self, "redis_password", None)
+        host = self.redis_host
+        port = self.redis_port
+        db = self.redis_db
+
+        auth_part = ""
+        if user and password:
+            auth_part = f"{quote(user)}:{quote(password)}@"
+        elif password:
+            auth_part = f":{quote(password)}@"
+        elif user:
+            auth_part = f"{quote(user)}@"
+
+        return f"redis://{auth_part}{host}:{port}/{db}"
 
 
 @lru_cache
