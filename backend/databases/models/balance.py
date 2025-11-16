@@ -163,11 +163,10 @@ class BalanceHistory(Base, BalanceBase):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
-        index=True,
         comment="Composite primary key (snapshot_date, id) for TimescaleDB",
     )
     id: Mapped[int] = mapped_column(
-        BigInteger, autoincrement=True, index=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
+        BigInteger, autoincrement=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -223,11 +222,10 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
-        index=True,
         comment="Composite primary key (snapshot_date, id) for TimescaleDB",
     )
     id: Mapped[int] = mapped_column(
-        BigInteger, autoincrement=True, index=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
+        BigInteger, autoincrement=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -333,11 +331,10 @@ class CexBalanceHistory(Base, CexBalanceBase):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
-        index=True,
         comment="Composite primary key (snapshot_date, id) for TimescaleDB",
     )
     id: Mapped[int] = mapped_column(
-        BigInteger, autoincrement=True, index=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
+        BigInteger, autoincrement=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
