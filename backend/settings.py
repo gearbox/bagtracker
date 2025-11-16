@@ -1,6 +1,7 @@
 from decimal import Decimal
 from enum import Enum
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -55,6 +56,11 @@ class Settings(BaseSettings):
     redis_host: str | None = None
     redis_port: int = 6379
     redis_db: int = 0
+    redis_username: str | None = None
+    redis_password: str | None = None
+
+    # Taskiq
+    taskiq_redis_url: str | None = None  # If not set, will be constructed from redis settings
 
     # Logging
     default_log_format: str = "[{time:%Y-%m-%d %H:%M:%S:%f %z}] - {name} - <level>{level}</level> - {message}"
@@ -113,6 +119,28 @@ class Settings(BaseSettings):
     @property
     def db_type(self) -> str:
         return DBType[self.db_driver_async.split("+")[0].upper()].value
+
+    @property
+    def redis_url(self) -> str:
+        """Redis URL"""
+        if self.taskiq_redis_url:
+            return self.taskiq_redis_url
+
+        user = getattr(self, "redis_username", None)
+        password = getattr(self, "redis_password", None)
+        host = self.redis_host
+        port = self.redis_port
+        db = self.redis_db
+
+        auth_part = ""
+        if user and password:
+            auth_part = f"{quote(user)}:{quote(password)}@"
+        elif password:
+            auth_part = f":{quote(password)}@"
+        elif user:
+            auth_part = f"{quote(user)}@"
+
+        return f"redis://{auth_part}{host}:{port}/{db}"
 
 
 @lru_cache
