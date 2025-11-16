@@ -1,8 +1,8 @@
 """init migration
 
-Revision ID: b1423ae03e75
+Revision ID: 6c914201aa32
 Revises:
-Create Date: 2025-11-09 16:44:05.671201
+Create Date: 2025-11-16 18:51:25.088045
 
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from backend.security.encryption import EncryptedString
 
 # revision identifiers, used by Alembic.
-revision: str = "b1423ae03e75"
+revision: str = "6c914201aa32"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -413,16 +413,22 @@ def upgrade() -> None:
     op.create_index(op.f("ix_balances_wallet_id"), "balances", ["wallet_id"], unique=False)
     op.create_table(
         "balances_history",
-        sa.Column("snapshot_date", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("snapshot_type", sa.String(length=20), nullable=False),
-        sa.Column("triggered_by", sa.String(length=50), nullable=True),
+        sa.Column(
+            "snapshot_date",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Composite primary key (snapshot_date, id) for TimescaleDB",
+        ),
         sa.Column(
             "id",
             sa.BigInteger(),
             autoincrement=True,
             nullable=False,
-            comment="Internal primary key for database operations",
+            comment="Composite primary key (snapshot_date, id) for TimescaleDB",
         ),
+        sa.Column("snapshot_type", sa.String(length=20), nullable=False),
+        sa.Column("triggered_by", sa.String(length=50), nullable=True),
         sa.Column(
             "uuid",
             sa.UUID(),
@@ -479,7 +485,6 @@ def upgrade() -> None:
     op.create_index("ix_balance_history_wallet_date", "balances_history", ["wallet_id", "snapshot_date"], unique=False)
     op.create_index(op.f("ix_balances_history_chain_id"), "balances_history", ["chain_id"], unique=False)
     op.create_index(op.f("ix_balances_history_created_at"), "balances_history", ["created_at"], unique=False)
-    op.create_index(op.f("ix_balances_history_snapshot_date"), "balances_history", ["snapshot_date"], unique=False)
     op.create_index(op.f("ix_balances_history_token_id"), "balances_history", ["token_id"], unique=False)
     op.create_index(op.f("ix_balances_history_uuid"), "balances_history", ["uuid"], unique=False)
     op.create_index(op.f("ix_balances_history_wallet_id"), "balances_history", ["wallet_id"], unique=False)
@@ -561,16 +566,22 @@ def upgrade() -> None:
     op.create_index(op.f("ix_nft_balances_uuid"), "nft_balances", ["uuid"], unique=False)
     op.create_table(
         "nft_balances_history",
-        sa.Column("snapshot_date", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("snapshot_type", sa.String(length=20), nullable=False),
-        sa.Column("triggered_by", sa.String(length=50), nullable=True),
+        sa.Column(
+            "snapshot_date",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Composite primary key (snapshot_date, id) for TimescaleDB",
+        ),
         sa.Column(
             "id",
             sa.BigInteger(),
             autoincrement=True,
             nullable=False,
-            comment="Internal primary key for database operations",
+            comment="Composite primary key (snapshot_date, id) for TimescaleDB",
         ),
+        sa.Column("snapshot_type", sa.String(length=20), nullable=False),
+        sa.Column("triggered_by", sa.String(length=50), nullable=True),
         sa.Column(
             "uuid",
             sa.UUID(),
@@ -601,9 +612,6 @@ def upgrade() -> None:
     )
     op.create_index("idx_nft_history_wallet_date", "nft_balances_history", ["wallet_id", "snapshot_date"], unique=False)
     op.create_index(op.f("ix_nft_balances_history_created_at"), "nft_balances_history", ["created_at"], unique=False)
-    op.create_index(
-        op.f("ix_nft_balances_history_snapshot_date"), "nft_balances_history", ["snapshot_date"], unique=False
-    )
     op.create_index(op.f("ix_nft_balances_history_uuid"), "nft_balances_history", ["uuid"], unique=False)
     op.create_table(
         "transactions",
@@ -804,16 +812,22 @@ def upgrade() -> None:
     op.create_index(op.f("ix_cex_balances_uuid"), "cex_balances", ["uuid"], unique=False)
     op.create_table(
         "cex_balances_history",
-        sa.Column("snapshot_date", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("snapshot_type", sa.String(length=20), nullable=False),
-        sa.Column("triggered_by", sa.String(length=50), nullable=True),
+        sa.Column(
+            "snapshot_date",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Composite primary key (snapshot_date, id) for TimescaleDB",
+        ),
         sa.Column(
             "id",
             sa.BigInteger(),
             autoincrement=True,
             nullable=False,
-            comment="Internal primary key for database operations",
+            comment="Composite primary key (snapshot_date, id) for TimescaleDB",
         ),
+        sa.Column("snapshot_type", sa.String(length=20), nullable=False),
+        sa.Column("triggered_by", sa.String(length=50), nullable=True),
         sa.Column(
             "uuid",
             sa.UUID(),
@@ -869,9 +883,6 @@ def upgrade() -> None:
     )
     op.create_index("idx_cex_history_token_date", "cex_balances_history", ["token_id", "snapshot_date"], unique=False)
     op.create_index(op.f("ix_cex_balances_history_created_at"), "cex_balances_history", ["created_at"], unique=False)
-    op.create_index(
-        op.f("ix_cex_balances_history_snapshot_date"), "cex_balances_history", ["snapshot_date"], unique=False
-    )
     op.create_index(op.f("ix_cex_balances_history_uuid"), "cex_balances_history", ["uuid"], unique=False)
     # ### end Alembic commands ###
 
@@ -885,7 +896,6 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index(op.f("ix_cex_balances_history_uuid"), table_name="cex_balances_history")
-    op.drop_index(op.f("ix_cex_balances_history_snapshot_date"), table_name="cex_balances_history")
     op.drop_index(op.f("ix_cex_balances_history_created_at"), table_name="cex_balances_history")
     op.drop_index("idx_cex_history_token_date", table_name="cex_balances_history")
     op.drop_index("idx_cex_history_subaccount_date", table_name="cex_balances_history")
@@ -915,7 +925,6 @@ def downgrade() -> None:
     op.drop_index("idx_tx_chain_status", table_name="transactions")
     op.drop_table("transactions")
     op.drop_index(op.f("ix_nft_balances_history_uuid"), table_name="nft_balances_history")
-    op.drop_index(op.f("ix_nft_balances_history_snapshot_date"), table_name="nft_balances_history")
     op.drop_index(op.f("ix_nft_balances_history_created_at"), table_name="nft_balances_history")
     op.drop_index("idx_nft_history_wallet_date", table_name="nft_balances_history")
     op.drop_table("nft_balances_history")
@@ -928,7 +937,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_balances_history_wallet_id"), table_name="balances_history")
     op.drop_index(op.f("ix_balances_history_uuid"), table_name="balances_history")
     op.drop_index(op.f("ix_balances_history_token_id"), table_name="balances_history")
-    op.drop_index(op.f("ix_balances_history_snapshot_date"), table_name="balances_history")
     op.drop_index(op.f("ix_balances_history_created_at"), table_name="balances_history")
     op.drop_index(op.f("ix_balances_history_chain_id"), table_name="balances_history")
     op.drop_index("ix_balance_history_wallet_date", table_name="balances_history")

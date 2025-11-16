@@ -11,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -159,7 +160,13 @@ class BalanceHistory(Base, BalanceBase):
     __tablename__ = "balances_history"
 
     snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        comment="Composite primary key (snapshot_date, id) for TimescaleDB",
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger, autoincrement=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -171,6 +178,7 @@ class BalanceHistory(Base, BalanceBase):
     chain = relationship("Chain", back_populates="balances_history")
 
     __table_args__ = (
+        PrimaryKeyConstraint("snapshot_date", "id"),
         CheckConstraint(
             "snapshot_type IN ('transaction', 'hourly', 'daily', 'weekly', 'monthly')", name="valid_snapshot_type"
         ),
@@ -211,7 +219,13 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
     __tablename__ = "nft_balances_history"
 
     snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        comment="Composite primary key (snapshot_date, id) for TimescaleDB",
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger, autoincrement=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -220,7 +234,10 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
 
     wallet = relationship("Wallet", back_populates="nft_balances_history")
 
-    __table_args__ = (Index("idx_nft_history_wallet_date", "wallet_id", "snapshot_date"),)
+    __table_args__ = (
+        PrimaryKeyConstraint("snapshot_date", "id"),
+        Index("idx_nft_history_wallet_date", "wallet_id", "snapshot_date"),
+    )
 
 
 @declarative_mixin
@@ -311,7 +328,13 @@ class CexBalanceHistory(Base, CexBalanceBase):
     __tablename__ = "cex_balances_history"
 
     snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True, primary_key=True
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        comment="Composite primary key (snapshot_date, id) for TimescaleDB",
+    )
+    id: Mapped[int] = mapped_column(
+        BigInteger, autoincrement=True, comment="Composite primary key (snapshot_date, id) for TimescaleDB"
     )
     snapshot_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hourly"
@@ -322,6 +345,7 @@ class CexBalanceHistory(Base, CexBalanceBase):
     token = relationship("Token", back_populates="cex_balances_history")
 
     __table_args__ = (
+        PrimaryKeyConstraint("snapshot_date", "id"),
         CheckConstraint(
             "snapshot_type IN ('transaction', 'hourly', 'daily', 'weekly', 'monthly')", name="valid_cex_snapshot_type"
         ),
