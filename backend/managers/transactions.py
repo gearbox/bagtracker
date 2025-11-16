@@ -1,3 +1,5 @@
+import uuid
+
 from loguru import logger
 
 from backend import schemas
@@ -67,7 +69,10 @@ class TransactionManager(BaseCRUDManager[Transaction]):
         return await self.get_all(wallet_id=wallet.id)
 
     async def update_tx(
-        self, obj_id: int | str, obj_data: schemas.TransactionCreateOrUpdate, recalculate_balance: bool = False
+        self,
+        obj_id: int | uuid.UUID | str,
+        obj_data: schemas.TransactionCreateOrUpdate,
+        recalculate_balance: bool = False,
     ) -> Transaction:
         """
         Updates a transaction.
