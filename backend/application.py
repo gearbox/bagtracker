@@ -15,6 +15,7 @@ from backend.databases.factory_async import close_async_database, init_database
 from backend.logger import init_logging
 from backend.security.encryption import init_encryption
 from backend.settings import settings
+from backend.taskiq_broker import broker
 
 
 # noinspection PyUnusedLocal
@@ -29,8 +30,21 @@ async def lifespan(app: FastAPI):
     init_logging()
     init_encryption()
     await init_database(settings.async_db_url, settings.db_type)
+
+    # Start Taskiq broker
+    logger.info("Starting Taskiq broker...")
+    if not broker.is_worker_process:
+        await broker.startup()
+    logger.info("Taskiq broker started")
+
     yield
+
     # shutdown logic
+    logger.info("Shutting down Taskiq broker...")
+    if not broker.is_worker_process:
+        await broker.shutdown()
+    logger.info("Taskiq broker shut down")
+
     await close_async_database()
 
 

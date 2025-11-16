@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     redis_host: str | None = None
     redis_port: int = 6379
     redis_db: int = 0
+    redis_password: str | None = None
+
+    # Taskiq
+    taskiq_redis_url: str | None = None  # If not set, will be constructed from redis settings
 
     # Logging
     default_log_format: str = "[{time:%Y-%m-%d %H:%M:%S:%f %z}] - {name} - <level>{level}</level> - {message}"
@@ -113,6 +117,15 @@ class Settings(BaseSettings):
     @property
     def db_type(self) -> str:
         return DBType[self.db_driver_async.split("+")[0].upper()].value
+
+    @property
+    def redis_url(self) -> str:
+        """Redis URL for Taskiq broker"""
+        if self.taskiq_redis_url:
+            return self.taskiq_redis_url
+
+        password_part = f":{self.redis_password}@" if self.redis_password else ""
+        return f"redis://{password_part}{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
 @lru_cache

@@ -10,4 +10,6 @@ def get_redis_client() -> redis.Redis:
         error_message = "Redis host is not set in settings"
         logger.error(error_message)
         raise RuntimeError(error_message)
-    return redis.Redis(host=settings.redis_host, port=settings.redis_port, db=settings.redis_db)
+    return redis.Redis(
+        host=settings.redis_host, port=settings.redis_port, db=settings.redis_db, password=settings.redis_password
+    )
