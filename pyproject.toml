@@ -1,6 +1,6 @@
 [project]
 name = "bagtracker"
-version = "0.0.13"
+version = "0.0.14"
 description = "Bag Tracker. Track Your Bags. Embrace the Rekt."
 authors = ["Mihail Tayrov <mtayrov@gmail.com>"]
 readme = "README.md"

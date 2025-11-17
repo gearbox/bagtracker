@@ -18,6 +18,11 @@ from backend.settings import settings
 from backend.taskiq_broker import broker
 
 
+async def precheck_config():
+    if not settings.telegram_bot_token:
+        logger.error("No Telegram bot token configured. Make sure TELEGRAM_BOT_TOKEN is set.")
+
+
 # noinspection PyUnusedLocal
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +41,7 @@ async def lifespan(app: FastAPI):
     if not broker.is_worker_process:
         await broker.startup()
     logger.info("Taskiq broker started")
+    await precheck_config()
 
     yield
 

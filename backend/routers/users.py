@@ -15,6 +15,18 @@ async def sign_up(
     user: schemas.UserSignUp,
     user_manager: Annotated[UserManager, Depends(UserManager)],
 ) -> schemas.UserNew:
+    """
+    Create a new user account.
+
+    - **username**: Unique username (alphanumeric)
+    - **password**: Password (min 8 characters)
+    - **email**: Valid email address
+    - **name**: First name (optional)
+    - **last_name**: Last name (optional)
+    - **nickname**: Nickname (optional)
+
+    Returns the created user information.
+    """
     return schemas.UserNew.model_validate(await user_manager.create_user(user))
 
 

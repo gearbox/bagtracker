@@ -130,3 +130,47 @@ class UserLoginInfo(BaseModel):
     nickname: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserLogin(BaseModel):
+    """Login request schema - supports username or email"""
+
+    username_or_email: str
+    password: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserLoginResponse(BaseModel):
+    """Login response schema with JWT token and user info"""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: UserLoginInfo
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TelegramAuthData(BaseModel):
+    """Telegram Mini App authentication data"""
+
+    id: int  # Telegram user ID
+    first_name: str | None = None
+    last_name: str | None = None
+    username: str | None = None
+    photo_url: str | None = None
+    auth_date: int
+    hash: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TelegramLoginResponse(BaseModel):
+    """Telegram login response schema with JWT token and user info"""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: UserLoginInfo
+    is_new_user: bool = False
+
+    model_config = ConfigDict(from_attributes=True)

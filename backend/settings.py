@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    # Telegram Bot Token for Mini App authentication
+    telegram_bot_token: str | None = None
+
     # api keys rotation reminder (days)
     api_key_rotation_days: int = 90
     # Security settings END
