@@ -1,10 +1,10 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from backend import schemas
 from backend.databases.models import User
 from backend.errors import UserError
 from backend.managers.base_crud import BaseCRUDManager
-from backend.security import hash_password
+from backend.security import hash_password, verify_password
 from backend.validators import get_uuid_or_rise
 
 
@@ -61,3 +61,95 @@ class UserManager(BaseCRUDManager):
     async def patch_user(self, username_or_id: str, user: schemas.UserPatch) -> User:
         user_obj = await self.get_user(username_or_id)
         return await user_obj.update(self.db, update_dict=user.model_dump(exclude_unset=True))
+
+    async def authenticate_user(self, username_or_email: str, password: str) -> User:
+        """
+        Authenticate a user by username/email and password.
+
+        Args:
+            username_or_email: Username or email address
+            password: Plain text password
+
+        Returns:
+            User object if authentication successful
+
+        Raises:
+            UserError: If user not found or password is incorrect
+        """
+        # Find user by username or email
+        stmt = select(User).filter(
+            or_(User.username == username_or_email.lower(), User.email == username_or_email.lower()),
+            User.is_deleted == False,  # noqa: E712
+        )
+        result = await self.db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise UserError(status_code=401, exception_message="Invalid username/email or password")
+
+        # Verify password
+        if not user.password_hash or not verify_password(password, user.password_hash):
+            raise UserError(status_code=401, exception_message="Invalid username/email or password")
+
+        # Update last login time
+        from datetime import UTC, datetime
+
+        user.last_login = datetime.now(UTC)
+        await user.save(self.db)
+
+        return user
+
+    async def get_or_create_telegram_user(self, telegram_data: schemas.TelegramAuthData) -> tuple[User, bool]:
+        """
+        Get or create a user from Telegram authentication data.
+
+        Args:
+            telegram_data: Telegram user data
+
+        Returns:
+            Tuple of (User object, is_new_user boolean)
+        """
+        # Check if user exists by telegram_id
+        stmt = select(User).filter(User.telegram_id == telegram_data.id, User.is_deleted == False)  # noqa: E712
+        result = await self.db.execute(stmt)
+        if user := result.scalar_one_or_none():
+            # Update last login time
+            from datetime import UTC, datetime
+
+            user.last_login = datetime.now(UTC)
+            # Update telegram_username if changed
+            if telegram_data.username and user.telegram_username != telegram_data.username:
+                user.telegram_username = telegram_data.username
+            await user.save(self.db)
+            return user, False
+
+        # Create new user
+        # Generate username from telegram data
+        username = telegram_data.username or f"tg_{telegram_data.id}"
+
+        # Ensure username is unique
+        base_username = username
+        counter = 1
+        while True:
+            stmt = select(User).filter(User.username == username, User.is_deleted == False)  # noqa: E712
+            result = await self.db.execute(stmt)
+            if not result.scalar_one_or_none():
+                break
+            username = f"{base_username}_{counter}"
+            counter += 1
+
+        new_user = User(
+            username=username,
+            telegram_id=telegram_data.id,
+            telegram_username=telegram_data.username,
+            name=telegram_data.first_name,
+            last_name=telegram_data.last_name,
+            password_hash=None,  # Telegram users don't need password
+        )
+
+        from datetime import UTC, datetime
+
+        new_user.last_login = datetime.now(UTC)
+        await new_user.save(self.db)
+
+        return new_user, True

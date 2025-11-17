@@ -32,6 +32,10 @@ class User(Base):
     nickname: Mapped[str | None] = mapped_column(String(50), nullable=True)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Telegram authentication fields
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    telegram_username: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     wallets = relationship("Wallet", back_populates="owner", cascade="all, delete-orphan")
     portfolios = relationship("Portfolio", back_populates="owner", cascade="all, delete-orphan")
     cex_accounts = relationship("CexAccount", back_populates="owner", cascade="all, delete-orphan")
@@ -39,7 +43,9 @@ class User(Base):
     __table_args__ = (
         Index("ix_users_username_active", "username", unique=True, postgresql_where="is_deleted = false"),
         Index("ix_users_email_active", "email", unique=True, postgresql_where="is_deleted = false"),
+        Index("ix_users_telegram_id", "telegram_id", unique=True),
         CheckConstraint(r"email ~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'", name="check_email_format_lower"),
+        UniqueConstraint("telegram_id", name="uq_telegram_identifier"),
     )
 
     @validates("email")

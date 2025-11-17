@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, declarative_mixin, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -185,6 +186,7 @@ class BalanceHistory(Base, BalanceBase):
         Index("ix_balance_history_token_date", "token_id", "chain_id", "snapshot_date"),
         Index("ix_balance_history_type_date", "snapshot_type", "snapshot_date"),
         Index("ix_balance_history_wallet_date", "wallet_id", "snapshot_date"),
+        Index("balances_history_snapshot_date_idx", text("snapshot_date DESC")),
     )
 
 
@@ -237,6 +239,7 @@ class NFTBalanceHistory(Base, NFTBalanceBase):
     __table_args__ = (
         PrimaryKeyConstraint("snapshot_date", "id"),
         Index("idx_nft_history_wallet_date", "wallet_id", "snapshot_date"),
+        Index("nft_balances_history_snapshot_date_idx", text("snapshot_date DESC")),
     )
 
 
@@ -351,4 +354,5 @@ class CexBalanceHistory(Base, CexBalanceBase):
         ),
         Index("idx_cex_history_subaccount_date", "subaccount_id", "snapshot_date"),
         Index("idx_cex_history_token_date", "token_id", "snapshot_date"),
+        Index("cex_balances_history_snapshot_date_idx", text("snapshot_date DESC")),
     )
