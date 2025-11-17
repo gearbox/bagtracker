@@ -9,6 +9,8 @@ import hashlib
 import hmac
 from typing import Any
 
+from loguru import logger
+
 from backend.settings import settings
 
 
@@ -37,6 +39,7 @@ def verify_telegram_auth(auth_data: dict[str, Any], bot_token: str | None = None
     if bot_token is None:
         bot_token = getattr(settings, "telegram_bot_token", None)
         if not bot_token:
+            logger.error("No Telegram bot token configured. Make sure TELEGRAM_BOT_TOKEN is set.")
             # If no bot token configured, skip verification (dev mode)
             # WARNING: This is insecure! Always set TELEGRAM_BOT_TOKEN in production
             return True
