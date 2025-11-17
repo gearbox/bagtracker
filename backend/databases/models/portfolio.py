@@ -45,7 +45,6 @@ class User(Base):
         Index("ix_users_email_active", "email", unique=True, postgresql_where="is_deleted = false"),
         Index("ix_users_telegram_id", "telegram_id", unique=True),
         CheckConstraint(r"email ~ '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$'", name="check_email_format_lower"),
-        UniqueConstraint("telegram_id", name="uq_telegram_identifier"),
     )
 
     @validates("email")
