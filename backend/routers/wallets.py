@@ -3,7 +3,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status as status_code
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.dependencies import get_async_session
 from backend.managers import WalletManager
 from backend.schemas import (
     Wallet,
@@ -15,6 +17,8 @@ from backend.schemas import (
     WalletPatch,
     WalletResponse,
 )
+from backend.services import EVMTransactionSyncService
+from backend.settings import Settings, get_settings
 
 router = APIRouter()
 
@@ -113,6 +117,64 @@ async def patch_wallet(
     wallet_id: str, wallet_data: WalletPatch, wallet_manager: Annotated[WalletManager, Depends(WalletManager)]
 ) -> Wallet:
     return Wallet.model_validate(await wallet_manager.patch(wallet_id, wallet_data))
+
+
+@router.post("/wallet/{wallet_id}/sync/transactions", status_code=status_code.HTTP_200_OK)
+async def sync_wallet_transactions(
+    wallet_id: str,
+    chain_id: int,
+    wallet_manager: Annotated[WalletManager, Depends(WalletManager)],
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    start_block: int | None = None,
+    end_block: int = 99999999,
+) -> dict:
+    """
+    Sync EVM transactions for a wallet on a specific chain using Etherscan API.
+
+    Args:
+        wallet_id: Wallet UUID
+        chain_id: Chain ID to sync
+        start_block: Starting block number (optional, defaults to last_sync_block or 0)
+        end_block: Ending block number (default: 99999999 = latest)
+
+    Returns:
+        Sync results with transaction counts
+    """
+    # Get wallet
+    wallet = await wallet_manager.get(wallet_id)
+
+    # Find wallet address for this chain
+    wallet_address = None
+    for addr in wallet.addresses:
+        if addr.chain_id == chain_id:
+            wallet_address = addr
+            break
+
+    if not wallet_address:
+        raise HTTPException(
+            status_code=status_code.HTTP_404_NOT_FOUND,
+            detail=f"Wallet {wallet_id} does not have an address on chain {chain_id}",
+        )
+
+    # Initialize sync service
+    sync_service = EVMTransactionSyncService(session=session, settings=settings)
+
+    try:
+        # Perform sync
+        result = await sync_service.sync_wallet_address_transactions(
+            wallet_address_id=wallet_address.id,
+            start_block=start_block,
+            end_block=end_block,
+            process_balances=True,
+        )
+
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=status_code.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=status_code.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from e
 
 
 @router.delete("/wallet/{wallet_id}", response_model=None, status_code=204)

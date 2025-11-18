@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     web3_provider: str = Web3Providers.LLAMARPC_ETH
     infura_api_key: str | None = None
 
+    # Etherscan API (for transaction syncing)
+    etherscan_api_key: str | None = None  # Ethereum mainnet & testnets
+    bscscan_api_key: str | None = None  # Binance Smart Chain
+    polygonscan_api_key: str | None = None  # Polygon
+    arbiscan_api_key: str | None = None  # Arbitrum
+    optimism_etherscan_api_key: str | None = None  # Optimism
+    basescan_api_key: str | None = None  # Base
+
     # Security settings START
     # Encryption
     encryption_key: str = "my encryption key, set in env"
